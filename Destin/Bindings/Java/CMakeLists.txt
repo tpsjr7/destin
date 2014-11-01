@@ -15,6 +15,6 @@ if(JNI_FOUND)
     )
     
 else(JNI_FOUND)
-    message("Couldn't find jni. Is a jdk installed? Not building java interfaces.")
+    message("Skipping Java language bindings. Could not find jni/JDK")
 endif(JNI_FOUND)
 
