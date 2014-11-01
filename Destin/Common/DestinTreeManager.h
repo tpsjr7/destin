@@ -281,6 +281,13 @@ public:
         tmw.reset();
     }
 
+    void clearFoundSubtrees(){
+        foundSubtrees.clear();
+    }
+
+    void clearAddedTrees(){
+        tmw.reset();
+    }
 };
 
 

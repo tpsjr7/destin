@@ -1,0 +1,13 @@
+<component name="libraryTable">
+  <library name="opencv">
+    <CLASSES>
+      <root url="file://$USER_HOME$/Downloads/opencv-2.4.9.build/modules/java/test/.build/bin" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES>
+      <root url="file://$USER_HOME$/Downloads/opencv-2.4.9.build/modules/java/test/.build/bin" />
+    </SOURCES>
+    <jarDirectory url="file://$USER_HOME$/Downloads/opencv-2.4.9.build/modules/java/test/.build/bin" recursive="false" />
+    <jarDirectory url="file://$USER_HOME$/Downloads/opencv-2.4.9.build/modules/java/test/.build/bin" recursive="false" type="SOURCES" />
+  </library>
+</component>
