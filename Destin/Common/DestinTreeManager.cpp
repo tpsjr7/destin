@@ -280,6 +280,10 @@ void DestinTreeManager::printHelper(TextTree & pt, short vertex, int level, stri
 string DestinTreeManager::getFoundSubtreeAsString(const int treeIndex){
     vector<short> t;
     stringstream ss;
+    if(treeIndex < 0 || treeIndex >= foundSubtrees.size()){
+        cerr << "Index out of bounds" << endl;
+        return "";
+    }
     tmw.treeToVector(foundSubtrees.at(treeIndex), t);
     ss << "size: " << t.size() << " : ";
     for(int i = 0 ; i < t.size() ; i ++){
