@@ -82,7 +82,7 @@ public:
       */
     short getTreeLabelForCentroid(const int centroid, const int layer, const int child_position);
 
-    /** Gets a tree of the winning centroid indexes of the destin network, represented a list.
+    /** Gets the current tree of the winning centroid indexes of the destin network, represented a list.
       * Encodes the tree by a depth first search path, using the getTreeLabelForCentroid()
       * method to get the label for each node, and using a -1 to represent a traceback.
       *
