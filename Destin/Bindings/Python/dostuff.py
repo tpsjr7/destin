@@ -179,6 +179,16 @@ def dci(layer, cent, equalize_hist = False, exp_weight = 4):
     dn.displayCentroidImage(layer, cent, 512, equalize_hist)
     cv2.waitKey(100)
 
+def dcis(layer, exp_weight = 4):
+	if layer < 0 or layer > top_layer:
+		print "Layer out of bounds"
+		return
+	dn.setCentImgWeightExponent(exp_weight)
+	dn.updateCentroidImages()
+	dn.displayLayerCentroidImages(layer)
+	cv2.waitKey(100)
+	 
+
 def wk(time=100):
     cv2.waitKey(time)
     
