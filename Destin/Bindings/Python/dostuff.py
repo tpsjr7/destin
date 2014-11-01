@@ -73,8 +73,11 @@ def doFramesWithWinningGrid(frames, layer):
 
 def doFramesWithCallback(frames, callback):
     for i in range(frames):
+    	t0 = time.time()
         doFrame()
         callback()
+        t1 = time.time()
+        print "fps: ", 1.0 / (t1- t0)
 
 def beliefAndGridCallback():
     dn.printBeliefGraph(top_layer, 0, 0)
