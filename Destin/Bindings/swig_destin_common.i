@@ -1,5 +1,5 @@
 
-%module(directors="1") DESTIN_MODULE 
+%module(directors="1") SWIG_MODULE_NAME
 %{
 /* includes that are needed to compile */
 #include "macros.h"
@@ -19,6 +19,7 @@
 #include "SomPresentor.h"
 #include "BeliefExporter.h"
 #include "DestinTreeManager.h"
+#include "CMOrderedTreeMinerWrapper.h"
 #include "CztMod.h"
 %}
 
@@ -62,6 +63,7 @@ See https://swig.svn.sourceforge.net/svnroot/swig/trunk/Examples/java/callback/
 %include "belief_transform.h"
 %include "DestinTreeManager.h"
 %include "CztMod.h"
+%include "CMOrderedTreeMinerWrapper.h"
 
 /* use c++ vector like a python list */
 %include "std_vector.i"
@@ -80,7 +82,6 @@ namespace std {
 %array_class(uint, SWIG_UInt_Array);
 %array_functions(Node *, SWIG_Node_p_Array);
 %array_class(Node, SWIG_NodeArray);
-
 
 /* some opencv functions */
 namespace cv {

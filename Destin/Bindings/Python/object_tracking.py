@@ -14,7 +14,7 @@ from object_tracking_config import *
 isTraining=True # train from scratch, or reload from previous run
 
 cm.init(centroids=centroids,
-        video_file="moving_square.avi",
+        video_file="moving_square.m4v",
         learn_rate=0.05,
         layer_widths=layer_widths,
         img_width=256

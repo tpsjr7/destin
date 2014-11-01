@@ -10,8 +10,11 @@ SET(CMAKE_BUILD_TYPE Release)
 #SET(CMAKE_EXE_LINKER_FLAGS -pg)
 #ADD_DEFINITIONS( -pg)
 
-####
+if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang" AND APPLE)
+include_directories( /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/../include/c++/v1/ )
+endif()
 
+####
 if(WIN32)
 set(SWIG_EXECUTABLE    C:/swigwin-2.0.11/swig.exe)
 set(OpenCV_DIR  C:/opencv-2.4.6/mingwbuild/install)
