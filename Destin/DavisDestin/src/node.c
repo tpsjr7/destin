@@ -568,6 +568,6 @@ void UpdateNodeSizes(Node * n, uint ni, uint nb, uint np, uint nc)
     }
     if (ns > n->d->maxNs)
     {
-        n->d->maxNs == ns;
+        n->d->maxNs = ns;
     }
 }

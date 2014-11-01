@@ -14,7 +14,15 @@ IF (CMAKE_BUILD_TYPE STREQUAL "")
 ENDIF()
 
 
-FIND_PACKAGE( OpenMP REQUIRED )
+FIND_PACKAGE(OpenMP)
+
+IF(OPENMP_FOUND)
+	IF(APPLE)
+		set(gomp /Users/tedsandersjr/code/libomp_oss/exports/mac_32e/lib.thin/libiomp5.dylib)
+	ENDIF()
+ELSE()
+	set(gomp "")
+ENDIF()
 
 SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
 SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS} ")
@@ -48,10 +56,10 @@ set(destalt_sources
 )
 
 ADD_LIBRARY( destinalt SHARED ${destalt_sources})
-TARGET_LINK_LIBRARIES( destinalt ${OpenCV_LIBS} gomp m)
+TARGET_LINK_LIBRARIES( destinalt ${OpenCV_LIBS} m ${gomp})
 
 ADD_LIBRARY( destinalt_test SHARED ${destalt_sources})
-TARGET_LINK_LIBRARIES( destinalt_test ${OpenCV_LIBS} m gomp)
+TARGET_LINK_LIBRARIES( destinalt_test ${OpenCV_LIBS} m ${gomp})
 SET_TARGET_PROPERTIES(destinalt_test PROPERTIES COMPILE_DEFINITIONS "UNIT_TEST")
 
 

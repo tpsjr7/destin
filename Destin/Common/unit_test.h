@@ -10,7 +10,7 @@
 #include <memory.h>
 #include <sys/time.h>
 
-#ifdef _WIN32
+#if defined(_WIN32) || defined(__APPLE__)
 typedef unsigned int uint;
 #endif
 int TEST_HAS_FAILURES = false; //checked at the end to determine if any tests have failed

@@ -3,7 +3,9 @@
 #include<math.h>
 #include<string.h>
 
-#include<quadmath.h>
+#ifndef __APPLE__
+#include <quadmath.h>
+#endif
 
 #include "opencv/cv.h"
 #include "opencv/highgui.h"

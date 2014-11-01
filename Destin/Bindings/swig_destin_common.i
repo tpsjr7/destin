@@ -1,5 +1,5 @@
 
-%module(directors="1") SWIG_MODULE_NAME 
+%module(directors="1") DESTIN_MODULE 
 %{
 /* includes that are needed to compile */
 #include "macros.h"
@@ -86,6 +86,7 @@ namespace std {
 namespace cv {
 class Mat;
 void imshow( const string& winname, const Mat& mat );
+int waitKey(int delay=0);
 }
 typedef struct CvPoint
 {

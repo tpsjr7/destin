@@ -3,7 +3,7 @@ INCLUDE_DIRECTORIES( ../Common )
 
 
 # don't link avutil_lib with windows
-if(WIN32)
+if(WIN32 OR APPLE)
 set(avutil_lib "")
 else()
 set(avutil_lib avutil)

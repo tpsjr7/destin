@@ -14,7 +14,7 @@
 #include "opencv/cv.h"
 #include "opencv/highgui.h"
 
-#ifndef _WIN32
+#if ! (defined(_WIN32) || defined (__APPLE__))
 extern "C"{
 #define UINT64_C //hack to avoid compile error in libavutil/log.h
 #include <libavutil/log.h> //used to turn off warning message
@@ -115,7 +115,7 @@ public:
         /*cap->set(CV_CAP_PROP_FRAME_WIDTH, target_size.width);
         cap->set(CV_CAP_PROP_FRAME_HEIGHT, target_size.height);*/
         cvMoveWindow(win_title.c_str(), 50, 50);
-#ifndef _WIN32
+#if !(defined(_WIN32) || defined(__APPLE__))
         av_log_set_level(AV_LOG_QUIET);//turn off message " No accelerated colorspace conversion found from yuv422p to bgr24"
 #endif
 	}

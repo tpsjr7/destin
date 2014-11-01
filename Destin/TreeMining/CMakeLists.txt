@@ -9,7 +9,7 @@ add_executable(testTreeMiner
 TestTreeMiner.cpp
 )
 
-if(WIN32)
+if(WIN32 OR APPLE)
 set(avutil "")
 else()
 set(avutil avutil)
