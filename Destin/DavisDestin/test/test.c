@@ -762,6 +762,8 @@ int testLinkParentsToChildren(){
 
     Node * parent = GetNodeFromDestin(d, 1, 0, 2);
 
+    assertBoolArrayEqualsV(d->hasMultiParents, d->nLayers, false, false, false, false);
+
     assertIntEquals(66, parent->nIdx);
     assertIntEquals(4, parent->children[0]->nIdx);
     assertIntEquals(5, parent->children[1]->nIdx);
@@ -773,6 +775,10 @@ int testLinkParentsToChildren(){
     assertTrue(parent->children[1]->parents[0] == parent);
     assertTrue(parent->children[2]->parents[0] == parent);
     assertTrue(parent->children[3]->parents[0] == parent);
+
+    assertTrue(parent->children[0]->firstParent == parent);
+    assertTrue(parent->children[1]->firstParent == parent);
+    assertTrue(parent->children[2]->firstParent == parent);
     assertTrue(parent->children[3]->firstParent == parent);
 
     // Parent of top layer node is null
@@ -792,6 +798,8 @@ int testLinkParentsToChildren(){
     uint inputDim = 9;
     d = makeDestinFromLayerCfg(3, inputDim, layerWidths);
 
+    assertBoolArrayEqualsV(d->hasMultiParents, d->nLayers, false, false, false);
+
     root = GetNodeFromDestin(d, 2, 0, 0);
     assertIntEquals(20, root->nIdx);
     parent = GetNodeFromDestin(d, 1, 1, 1);
@@ -809,6 +817,8 @@ int testLinkParentsToChildren(){
     inputDim = 1;
     uint layerWidths2[] = {12, 3, 1, 1};
     d = makeDestinFromLayerCfg(4, inputDim, layerWidths2);
+
+    assertBoolArrayEqualsV(d->hasMultiParents, d->nLayers, false, false, false, false);
 
     root = GetNodeFromDestin(d, 3, 0, 0);
     assertIntEquals(154, root->nIdx);
@@ -1241,6 +1251,8 @@ int testBuildOverlappingHeirarchy(){
                     8, 7, 6, 2, 1);
 
     Destin * d = InitDestinWithConfig(config);
+
+    assertBoolArrayEqualsV(d->hasMultiParents, d->nLayers, true, true, false, false, false);
 
     assertIntEquals(4, GetNodeFromDestin(d, 1, 0, 0)->nChildren);
 

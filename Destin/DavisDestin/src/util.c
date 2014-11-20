@@ -343,6 +343,7 @@ static void _initializeDestinParameters(uint *nb, uint *layerMaxNb, uint *layerW
     MALLOC(d->layerWidth, uint, nl);
     memcpy(d->layerWidth, layerWidths, sizeof(uint) * nl);
 
+    MALLOC(d->hasMultiParents, bool, nl);
 
     // init the train mask (determines which layers should be training)
     MALLOC(d->layerMask, uint, d->nLayers);
@@ -494,13 +495,16 @@ bool LinkParentsToChildren( Destin *d )
             // non overlappings
             // Child can be divided evenly
             _LinkNonOverlapping(l, d);
+            d->hasMultiParents[l] = false;
         } else if(childLayerWidth - parentLayerWidth == 1){
             _LinkOverlapping(l, d);
+            d->hasMultiParents[l] = true;
         } else {
             fprintf(stderr, "Unsupported structure from layer %i to %i.\n", l, l+1);
             return false;
         }
     }
+    d->hasMultiParents[d->nLayers - 1] = false; //manually set the top layer
     return true;
 }
 
@@ -560,6 +564,7 @@ void DestroyDestin( Destin * d )
     FREE(d->layerNodeOffsets);
     FREE(d->layerWidth);
     FREE(d->inputLabel);
+    FREE(d->hasMultiParents);
     FREE(d);
 }
 

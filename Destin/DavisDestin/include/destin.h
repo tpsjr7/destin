@@ -22,7 +22,7 @@ typedef struct Destin {
     uint *layerMaxNb;                   // max number of beliefs for layer (upper limit for centroid addition)
     uint *nci;                          // input dimensionality for layer 0 and number of children for layers above zero
 
-    struct Node * nodes;                // pointer to list of host nodes
+    struct Node * nodes;                // pointer to array of nodes
 
     float       * temp;                 // temperatures for each layer, used with the belief tranform functions.
     float       * dataSet;              // pointer to dataset
@@ -32,6 +32,12 @@ typedef struct Destin {
     uint        * layerWidth;           // node width for each layer
     uint        * layerNodeOffsets;     // stores the node id of the first node of each layer
     uint        * layerMask;            // controls which layers are training. 1 = train, 0 = not train.
+
+    bool        * hasMultiParents;      // An array of bools of length nLayers. If element of array is true, then each node
+                                        // of corresponding layer can potentially have more than one parent.
+                                        // The top and second from top layers will always be false.
+                                        // Generally hasMultiParents[L] is false if layerWidth[L] mod layerWidth[L + 1] == 0
+                                        // See LinkParentsToChildren() function.
 
     CentroidLearnStrat   centLearnStrat;        // centroid learning strategy enum
     CentroidLearnStratFunc centLearnStratFunc;  // centroid learning strategy function pointer
