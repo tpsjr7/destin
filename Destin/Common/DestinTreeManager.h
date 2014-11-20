@@ -4,6 +4,7 @@
 
 #include "DestinNetworkAlt.h"
 #include "CMOrderedTreeMinerWrapper.h"
+#include "DestinTreeIteratorCallback.h"
 
 /**
  * Performs subtree mining using CMOrderedTreeMinerWrapper.
@@ -34,6 +35,8 @@ class DestinTreeManager {
     // converts a depth first path (without -1 backtraces) index into a particular node location.
     // Used while drawing borders around subtree locations.
     vector<NodeLocation> convertNodeLocation;
+
+    void iterateTreeHelper(DestinTreeIteratorCallback& callback, const Node * parent, const int child_num);
 
     // contructs convertNodeLocation vector
     void createConvertNodeLocationsHelper(const Node * parent);
@@ -72,6 +75,11 @@ public:
     DestinTreeManager(DestinNetworkAlt & destin, int bottom);
 
     ~DestinTreeManager();
+
+    /** Iterates over each node in the destin network
+     * @param callback - calls this on each node
+     */
+    void iterateTree(DestinTreeIteratorCallback& callback);
 
     /** Takes the given label and decodes it into centroid, layer, and child position ( 0 to 3 )
       */

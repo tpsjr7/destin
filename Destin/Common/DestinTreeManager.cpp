@@ -64,6 +64,21 @@ void DestinTreeManager::calcWinningCentroidTreeSize(const Node * parent, int & c
     return;
 }
 
+void DestinTreeManager::iterateTreeHelper(DestinTreeIteratorCallback& callback, const Node * parent, const int child_num){
+    callback.callback(*parent, child_num);
+    if(parent->layer > bottomLayer && parent->children != NULL){
+        for(int i = 0 ; i < parent->nChildren ; i++){
+            iterateTreeHelper(callback, parent->children[i], i);
+        }
+    }
+    return;
+}
+
+void DestinTreeManager::iterateTree(DestinTreeIteratorCallback& callback){
+    iterateTreeHelper(callback, destin.getNode(nLayers - 1, 0, 0), 0);
+    return;
+}
+
 int DestinTreeManager::buildTree(const Node * parent, int pos, const int child_num){
     int layer = parent->layer;
     winnerTree[pos] = getTreeLabelForCentroid(parent->winner, layer, child_num);
@@ -256,6 +271,7 @@ std::vector<short> DestinTreeManager::getFoundSubtree(const int treeIndex){
     tmw.treeToVector(foundSubtrees.at(treeIndex), out);
     return out;
 }
+
 
 void DestinTreeManager::printHelper(TextTree & pt, short vertex, int level, stringstream & ss){
     for (int i = 0; i < level; i++ ){
