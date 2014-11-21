@@ -25,14 +25,14 @@ public:
                 Node * parent = node.parents[p];
                 if(parent != NULL){
                     output << "(has" << p << "ParentCentroid " << node.nIdx << " " << parent->winner << " )" << endl;
-                    output << "(hasParent " << node.nIdx << " " << parent->nIdx << " )" << endl;
+                    output << "(has" << p << "Parent "         << node.nIdx << " " << parent->nIdx << " )" << endl;
                 }
             }
         } else {
             if(node.firstParent != NULL){
                 int parent_num = 3 - child_position;
                 output << "(has" << parent_num << "ParentCentroid " << node.nIdx << " " << node.firstParent->winner << " )" << endl;
-                output << "(hasParent " << node.nIdx << " " << node.firstParent->nIdx << ")" << endl;
+                output << "(has" << parent_num << "Parent "  << node.nIdx << " " << node.firstParent->nIdx << " )" << endl;
             }
         }
 
@@ -71,7 +71,7 @@ int main(int argc, char ** argv){
 
     DestinNetworkAlt dna(W256, 7, counts, true);
 
-    VideoSource vs(true,"");
+    VideoSource vs(false,"../Bindings/Python/moving_square.avi");
     vs.setSize(256,256);
     vs.enableDisplayWindow();
     for(int i = 0 ; i < 50 ; i++){
