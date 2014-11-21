@@ -7,6 +7,7 @@ It trains on the video for a really short time, 50 frames. The goal is to simply
 Then a DestinTreeManager is used to iterate through all the nodes in the DeSTIN network, and uses the "AtomGenerator" callback to generate some scheme atoms in text format.
 
 > cd Destin/Common/
+
 > ./openCogAtomGenerator > atoms.txt
 
 Start the OpenCog server in a new console tab:
