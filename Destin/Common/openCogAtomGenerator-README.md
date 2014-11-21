@@ -14,8 +14,8 @@ Start the OpenCog server in a new console tab:
 
 > cd ~/opencog/build; ./opencog/server/cogserver
 
-Back in DeSTIN directory:
+Back in Destin/Common/ directory:
 
-> (echo "scm" ; cat predicates.scm output.txt | head -10000 ) | telnet localhost 17001
+> (echo "scm" ; cat predicates.scm atoms.txt | head -10000 ) | telnet localhost 17001
 
 The head -10000 is there to limit the amount of Atoms, as it takes too much memory currently.
