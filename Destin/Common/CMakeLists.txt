@@ -30,7 +30,7 @@ find_package( OpenCV REQUIRED)
 target_link_libraries(testCifarSource ${OpenCV_LIBS})
 target_link_libraries(common cm_ordered_treeminer_wrapper destinalt)
 target_link_libraries(testDestinNetworkAlt common destinalt)
-target_link_libraries(openCogAtomGenerator common destinalt)
+target_link_libraries(openCogAtomGenerator common destinalt avutil)
 
 install(TARGETS common testCifarSource testDestinNetworkAlt
     RUNTIME DESTINATION bin
