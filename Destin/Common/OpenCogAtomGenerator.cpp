@@ -65,14 +65,57 @@ public:
 
 };
 
+void usage(char ** argv){
+    cout << argv[0] << " [layers =< 7] [tree count]" << endl;
+}
+
 int main(int argc, char ** argv){
 
-    uint counts[] = {5,5,5,5,5,5,5};
+    if(argc != 3){
+        usage(argv);
+        return 0;
+    }
 
-    DestinNetworkAlt dna(W256, 7, counts, true);
+    int layers = atoi(argv[1]);
+
+    uint counts[] = {5,5,5,5,5,5,5,5,5,5};
+
+    SupportedImageWidths width;
+    switch (layers) {
+        case 7:
+            width = W256;
+            break;
+        case 6:
+            width = W128;
+            break;
+        case 5:
+            width = W64;
+            break;
+        case 4:
+            width = W32;
+            break;
+        case 3:
+            width = W16;
+            break;
+        case 2:
+            width = W8;
+            break;
+        case 1:
+            width = W4;
+            break;
+        default:
+            usage(argv);
+            return 0;
+    }
+
+    int trees = atoi(argv[2]);
+
+    DestinNetworkAlt dna(width, layers, counts, true);
+
+    //dna.load("../Bindings/Python/square.dst");
 
     VideoSource vs(false,"../Bindings/Python/moving_square.avi");
-    vs.setSize(256,256);
+    vs.setSize(width,width);
     vs.enableDisplayWindow();
     for(int i = 0 ; i < 50 ; i++){
         vs.grab();
@@ -81,7 +124,12 @@ int main(int argc, char ** argv){
 
     DestinTreeManager tm(dna, 0);
     AtomGenerator ag(std::cout);
-    tm.iterateTree(ag);
+
+    for(int i = 0 ; i < trees ; i++){
+        vs.grab();
+        dna.doDestin(vs.getOutput());
+        tm.iterateTree(ag);
+    }
 
     return 0;
 }
