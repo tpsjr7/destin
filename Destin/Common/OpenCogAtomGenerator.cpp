@@ -66,7 +66,7 @@ public:
 };
 
 void usage(char ** argv){
-    cout << argv[0] << " [layers =< 7] [tree count]" << endl;
+    cout << argv[0] << " [layers 2 to 7] [tree count]" << endl;
 }
 
 int main(int argc, char ** argv){
@@ -99,9 +99,6 @@ int main(int argc, char ** argv){
             break;
         case 2:
             width = W8;
-            break;
-        case 1:
-            width = W4;
             break;
         default:
             usage(argv);
