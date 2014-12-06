@@ -640,7 +640,7 @@ void _DstWriteCheck(void * dest, size_t element_size, size_t count, FILE * file,
     _DstWriteCheck(dest, size, count, file, __LINE__);\
 }
 
-void SaveDestin( Destin *d, char *filename )
+void SaveDestin( Destin *d, const char *filename )
 {
     uint i, j, l;
     Node *nTmp;

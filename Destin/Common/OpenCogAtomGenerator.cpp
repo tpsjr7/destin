@@ -100,31 +100,6 @@ public:
     }
 };
 
-void usage(char ** argv){
-    cout << argv[0] << " -t [a=atoms, g=graph] -l [layers 2 to 7] -tc [tree count] -w widths -c [centroids] -iw [img width]" << endl;
-}
-
-struct ArgConfig {
-
-    ArgConfig(){
-        type = "g";
-        uint the_width[] = {4,2,1};
-        widths = vector<uint>(the_width, the_width + 3);
-        layers = 3;
-        treeCount = 1;
-        uint the_centroids[] = {5,5,5};
-        centroids = vector<uint>(the_centroids, the_centroids + 3);
-        imgWidth = 16;
-    }
-
-    string type;
-    vector<uint> widths;
-    vector<uint> centroids;
-    int layers;
-    int treeCount;
-    int imgWidth;
-};
-
 // convert string of comma seperated numbers into an array
 vector<uint> splitNumbers(char * strNums){
     char * c;
@@ -134,9 +109,47 @@ vector<uint> splitNumbers(char * strNums){
         nums.push_back(atoi(c));
         c = strtok(NULL, ",");
     }
-
     return nums;
 }
+
+void usage(char ** argv){
+    cout << argv[0] << " --mode [a=atoms, g=graph] --layers [layers] --n-out [count] " << endl
+                    << "--widths widths --cents [centroids] --img-width [img width]" << endl
+                    << "<--load [filename]> <--save [filename]> <--hide-video> <--train-frames [frames=50]>" << endl
+                    << "<--out filename>" << endl
+                       ;
+}
+
+struct ArgConfig {
+
+    ArgConfig(){
+        uint the_centroids[] = {5,5,5};
+        centroids = vector<uint>(the_centroids, the_centroids + 3);
+
+        imgWidth = 16;
+        layers = 3;
+        load = "";
+        mode = "g";
+        outputFile = "";
+        showVid = true;
+        trainFrames = 50;
+        treeCount = 1;
+        uint the_width[] = {4,2,1};
+        widths = vector<uint>(the_width, the_width + 3);
+    }
+
+    vector<uint>    centroids;
+    int             layers;
+    string          load;
+    string          mode;
+    string          outputFile;
+    string          save;
+    bool            showVid;
+    int             trainFrames;
+    int             treeCount;
+    vector<uint>    widths;
+    int             imgWidth;
+};
 
 ArgConfig parseArgs(int argc, char ** argv){
     int arg = 1;
@@ -148,18 +161,29 @@ ArgConfig parseArgs(int argc, char ** argv){
         string argString(args.at(arg));
 
         arg++;
-        if(argString == "-t"){
-            config.type = string(args.at(arg));
-        } else if(argString == "-w"){
+        if(argString == "--mode"){
+            config.mode = string(args.at(arg));
+        } else if(argString == "--widths"){
             config.widths = splitNumbers(args.at(arg));
-        } else if(argString == "-c"){
+        } else if(argString == "-cents"){
             config.centroids = splitNumbers(args.at(arg));
-        } else if(argString == "-l"){
+        } else if(argString == "--layers"){
             config.layers = atoi(args.at(arg));
-        } else if(argString == "-tc"){
+        } else if(argString == "--n-out"){
             config.treeCount =  atoi(args.at(arg));
-        } else if(argString == "-iw"){
+        } else if(argString == "--img-width"){
             config.imgWidth = atoi(args.at(arg));
+        } else if(argString == "--load"){
+            config.load = args.at(arg);
+        } else if(argString == "--save"){
+            config.save = args.at(arg);
+        } else if(argString == "--train-frames"){
+            config.trainFrames = atoi(args.at(arg));
+        } else if(argString == "--hide-video"){
+            config.showVid = false;
+            arg--;//doesn't take a value
+        } else if(argString == "--out"){
+            config.outputFile = args.at(arg);
         }
         arg++;
     }
@@ -176,46 +200,72 @@ int main(int argc, char ** argv){
 
     ArgConfig config = parseArgs(argc, argv);
 
-    string mode = config.type;
+    ostream * out_stream;
+    ofstream fs;
 
-    int layers = config.layers;
-
-
-    uint * counts = &config.centroids[0];
+    if(config.outputFile != ""){
+        fs.open(config.outputFile.c_str());
+        if(!fs.is_open()){
+            stringstream mess ; mess << "Could not open file " << config.outputFile << endl;
+            throw std::runtime_error(mess.str());
+        }
+        out_stream = &fs;
+    } else {
+        out_stream = &std::cout;
+    }
 
     int width = config.imgWidth;
-    int trees = config.treeCount;
-
-    DestinNetworkAlt dna(width, layers, counts, true, &config.widths[0]);
-
-    //dna.load("../Bindings/Python/square.dst");
+    DestinNetworkAlt dna(width, config.layers,  &config.centroids[0], true, &config.widths[0]);
 
     VideoSource vs(false,"../Bindings/Python/moving_square.m4v");
     vs.setSize(width,width);
-    vs.enableDisplayWindow();
-    for(int i = 0 ; i < 50 ; i++){
-        vs.grab();
-        dna.doDestin(vs.getOutput());
+    if(config.showVid){
+        vs.enableDisplayWindow();
+    }
+
+    if(config.load == ""){
+        cout << "Training " << config.trainFrames << " frames..." << endl;
+
+        for(int i = 0 ; i < config.trainFrames ; i++){
+            cout << ".";
+            vs.grab();
+            dna.doDestin(vs.getOutput());
+        }
+        cout << endl << "Done training." << endl;
+    } else {
+        dna.load(config.load.c_str());
+        cout << "Loaded: " << config.load << endl;
     }
 
     DestinTreeManager tm(dna, 0);
-    AtomGenerator ag(std::cout);
 
-    DestinGraphNodePrinter np(std::cout);
-    DestinGraphEdgePrinter ep(std::cout);
+    AtomGenerator ag(*out_stream);
 
-    for(int i = 0 ; i < trees ; i++){
-        vs.grab();
+    DestinGraphNodePrinter np(*out_stream);
+    DestinGraphEdgePrinter ep(*out_stream);
+
+    for(int i = 0 ; i <  config.treeCount ; i++){
+
+        if(!vs.grab()){
+            vs.grab(); // try again if at the end of the video
+        }
         dna.doDestin(vs.getOutput());
 
-        if(mode == "a"){
+        if(config.mode == "a"){
             tm.iterateTree(ag);
-        } else if(mode == "g") {
+        } else if(config.mode == "g") {
             tm.iterateGraph(np);
             tm.iterateGraph(ep);
             cout << endl;
         }
     }
 
+    if(config.save != ""){
+        dna.save(config.save.c_str());
+    }
+
+    if(config.outputFile != ""){
+        fs.close();
+    }
     return 0;
 }

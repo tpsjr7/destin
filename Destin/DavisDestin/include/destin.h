@@ -151,9 +151,9 @@ void TestDestin(                        // test destin.
                  bool                   // generative/output ?
                 );
 
-void SaveDestin(                        // save destin to disk
+void SaveDestin(// save destin to disk
                 Destin *,               // network to save
-                char *                  // filename to save to
+                const char *                  // filename to save to
         );
 
 Destin * LoadDestin(                    // load destin from disk

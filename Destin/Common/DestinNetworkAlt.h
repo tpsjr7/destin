@@ -275,7 +275,7 @@ public:
     /** Saves the current destin network to file
      * Includes centroid locations, and current and previous beliefs.
      */
-    void save(char * fileName){
+    void save(const char * fileName){
         SaveDestin(destin, fileName);
     }
 
