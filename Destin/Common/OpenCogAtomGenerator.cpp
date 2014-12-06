@@ -65,18 +65,43 @@ public:
 
 };
 
+class DestinGraphPrinter : public DestinGraphIteratorCallback {
+    std::ostream & out;
+
+public:
+    DestinGraphPrinter(std::ostream & out)
+        :out(out){}
+
+    virtual void callback(const Node& node, const bool isBottom){
+        out << "n " << node.nIdx << " L_" << node.layer << "_W_" << node.winner << endl;
+
+        if(isBottom){
+            return;
+        }
+
+        const int nChildren = node.nChildren;
+        for(int i = 0 ; i < nChildren; i++){
+            out << "e " << node.nIdx << " " << node.children[i]->nIdx << " child_edge_" << i << endl;
+        }
+        return;
+    }
+};
+
+
 void usage(char ** argv){
-    cout << argv[0] << " [layers 2 to 7] [tree count]" << endl;
+    cout << argv[0] << "[a=atoms, g=graph] [layers 2 to 7] [tree count]" << endl;
 }
 
 int main(int argc, char ** argv){
 
-    if(argc != 3){
+    if(argc != 4){
         usage(argv);
         return 0;
     }
 
-    int layers = atoi(argv[1]);
+    string mode = argv[1];
+
+    int layers = atoi(argv[2]);
 
     uint counts[] = {5,5,5,5,5,5,5,5,5,5};
 
@@ -105,7 +130,7 @@ int main(int argc, char ** argv){
             return 0;
     }
 
-    int trees = atoi(argv[2]);
+    int trees = atoi(argv[3]);
 
     DestinNetworkAlt dna(width, layers, counts, true);
 
@@ -122,10 +147,17 @@ int main(int argc, char ** argv){
     DestinTreeManager tm(dna, 0);
     AtomGenerator ag(std::cout);
 
+    DestinGraphPrinter dgp(std::cout);
+
     for(int i = 0 ; i < trees ; i++){
         vs.grab();
         dna.doDestin(vs.getOutput());
-        tm.iterateTree(ag);
+
+        if(mode == "a"){
+            tm.iterateTree(ag);
+        } else if(mode == "g") {
+            tm.iterateGraph(dgp);
+        }
     }
 
     return 0;

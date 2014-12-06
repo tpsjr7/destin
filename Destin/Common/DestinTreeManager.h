@@ -62,6 +62,8 @@ class DestinTreeManager {
 
     int winningTreeNodeSize(int bottom_layer);
 
+    void iterateGraphHelper(DestinGraphIteratorCallback& callback, const Node * parent, std::vector<bool> & nodesVisited);
+
 public:
 
     /** Constructor
@@ -80,6 +82,9 @@ public:
      * @param callback - calls this on each node
      */
     void iterateTree(DestinTreeIteratorCallback& callback);
+
+    void iterateGraph(DestinGraphIteratorCallback& callback);
+
 
     /** Takes the given label and decodes it into centroid, layer, and child position ( 0 to 3 )
       */

@@ -1,5 +1,6 @@
 
 #include "DestinTreeManager.h"
+#include <vector>
 
 DestinTreeManager::DestinTreeManager(DestinNetworkAlt & destin, int bottom)
     :destin(destin), nLayers(destin.getLayerCount()), winnerTree(NULL)
@@ -76,6 +77,30 @@ void DestinTreeManager::iterateTreeHelper(DestinTreeIteratorCallback& callback, 
 
 void DestinTreeManager::iterateTree(DestinTreeIteratorCallback& callback){
     iterateTreeHelper(callback, destin.getNode(nLayers - 1, 0, 0), 0);
+    return;
+}
+
+void DestinTreeManager::iterateGraphHelper(DestinGraphIteratorCallback & callback, const Node * parent, std::vector<bool> & nodesVisited){
+    if(nodesVisited[parent->nIdx]){
+        return; // already visited
+    } else {
+        nodesVisited[parent->nIdx] = true;
+    }
+
+    bool isBottom = parent->layer <= bottomLayer || parent->children == NULL;
+
+    callback.callback(*parent, isBottom);
+    if(!isBottom){
+        for(int i = 0 ; i < parent->nChildren ; i++){
+            iterateGraphHelper(callback, parent->children[i], nodesVisited);
+        }
+    }
+    return;
+}
+
+void DestinTreeManager::iterateGraph(DestinGraphIteratorCallback & callback){
+    std::vector<bool> visited(destin.getNetwork()->nNodes, false);
+    iterateGraphHelper(callback, destin.getNode(nLayers - 1, 0, 0), visited);
     return;
 }
 

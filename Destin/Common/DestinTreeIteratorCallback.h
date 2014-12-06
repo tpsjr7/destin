@@ -10,4 +10,11 @@ public:
     virtual void callback(const Node& node, int child_position) = 0;
 };
 
+class DestinGraphIteratorCallback
+{
+public:
+    virtual ~DestinGraphIteratorCallback(){}
+    virtual void callback(const Node& node, bool isBottom) = 0;
+};
+
 #endif // DESTINTREEITERATORCALLBACK_H
