@@ -261,6 +261,8 @@ int testUniform(){
     SetBeliefTransform(d, DST_BT_BOLTZ);
     assertTrue(d->isUniform);
 
+    assertIntEquals(5, d->nNodes);
+
     float image []  = {.11,.22,.88,.99};//1 pixel for each of the 4 bottom layer nodes
 
     Node * n = &d->nodes[0];
@@ -564,6 +566,7 @@ int _testSaveDestin2(bool isUniform, CentroidLearnStrat learningStrat, BeliefTra
     Destin * d = InitDestinWithConfig(dc);
     DestroyConfig(dc);
 
+    assertIntEquals(1 + 2*2 + 4*4 + 8*8, d->nNodes);
     SetLearningStrat(d, learningStrat);
     SetBeliefTransform(d, bt);
     turnOnMask(d);
