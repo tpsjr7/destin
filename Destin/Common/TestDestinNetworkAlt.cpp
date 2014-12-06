@@ -39,5 +39,5 @@ int regressionTest(){
 int testAddCentroid(){
     uint centroids[4] = {4,4,4,4};
     DestinNetworkAlt dna(W32, 4,  centroids, true);
-
+    return 0;
 }

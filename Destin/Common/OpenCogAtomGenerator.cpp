@@ -190,7 +190,7 @@ int main(int argc, char ** argv){
 
     //dna.load("../Bindings/Python/square.dst");
 
-    VideoSource vs(false,"../Bindings/Python/moving_square.avi");
+    VideoSource vs(false,"../Bindings/Python/moving_square.m4v");
     vs.setSize(width,width);
     vs.enableDisplayWindow();
     for(int i = 0 ; i < 50 ; i++){
