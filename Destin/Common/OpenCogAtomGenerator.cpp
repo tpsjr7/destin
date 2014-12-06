@@ -65,6 +65,8 @@ public:
 
 };
 
+
+
 class DestinGraphPrinter : public DestinGraphIteratorCallback {
     std::ostream & out;
 
@@ -89,50 +91,95 @@ public:
 
 
 void usage(char ** argv){
-    cout << argv[0] << "[a=atoms, g=graph] [layers 2 to 7] [tree count]" << endl;
+    cout << argv[0] << " -t [a=atoms, g=graph] -l [layers 2 to 7] -tc [tree count] -w widths -c [centroids] -iw [img width]" << endl;
+}
+
+struct ArgConfig {
+
+    ArgConfig(){
+        type = "g";
+        uint the_width[] = {4,2,1};
+        widths = vector<uint>(the_width, the_width + 3);
+        layers = 3;
+        treeCount = 1;
+        uint the_centroids[] = {5,5,5};
+        centroids = vector<uint>(the_centroids, the_centroids + 3);
+        imgWidth = 16;
+    }
+
+    string type;
+    vector<uint> widths;
+    vector<uint> centroids;
+    int layers;
+    int treeCount;
+    int imgWidth;
+};
+
+// convert string of comma seperated numbers into an array
+vector<uint> splitNumbers(char * strNums){
+    char * c;
+    c = strtok(strNums,",");
+    vector<uint> nums;
+    while(c != NULL){
+        nums.push_back(atoi(c));
+        c = strtok(NULL, ",");
+    }
+
+    for(int i = 0 ; i < nums.size() ; i++){
+        cout << nums[i] << endl;
+    }
+    return nums;
+}
+
+ArgConfig parseArgs(int argc, char ** argv){
+    int arg = 1;
+
+    std::vector<char *> args(argv, argv + argc);
+
+    ArgConfig config;
+    while(arg < argc){
+        string argString(args.at(arg));
+
+        arg++;
+        if(argString == "-t"){
+            config.type = string(args.at(arg));
+        } else if(argString == "-w"){
+            config.widths = splitNumbers(args.at(arg));
+        } else if(argString == "-c"){
+            config.centroids = splitNumbers(args.at(arg));
+        } else if(argString == "-l"){
+            config.layers = atoi(args.at(arg));
+        } else if(argString == "-tc"){
+            config.treeCount =  atoi(args.at(arg));
+        } else if(argString == "-iw"){
+            config.imgWidth = atoi(args.at(arg));
+        }
+        arg++;
+    }
+
+    return config;
 }
 
 int main(int argc, char ** argv){
 
-    if(argc != 4){
+    if(argc == 1){
         usage(argv);
         return 0;
     }
 
-    string mode = argv[1];
+    ArgConfig config = parseArgs(argc, argv);
 
-    int layers = atoi(argv[2]);
+    string mode = config.type;
 
-    uint counts[] = {5,5,5,5,5,5,5,5,5,5};
+    int layers = config.layers;
 
-    SupportedImageWidths width;
-    switch (layers) {
-        case 7:
-            width = W256;
-            break;
-        case 6:
-            width = W128;
-            break;
-        case 5:
-            width = W64;
-            break;
-        case 4:
-            width = W32;
-            break;
-        case 3:
-            width = W16;
-            break;
-        case 2:
-            width = W8;
-            break;
-        default:
-            usage(argv);
-            return 0;
-    }
 
-    int trees = atoi(argv[3]);
+    uint * counts = &config.centroids[0];
 
-    DestinNetworkAlt dna(width, layers, counts, true);
+    int width = config.imgWidth;
+    int trees = config.treeCount;
+
+    DestinNetworkAlt dna(width, layers, counts, true, &config.widths[0]);
 
     //dna.load("../Bindings/Python/square.dst");
 
@@ -157,6 +204,7 @@ int main(int argc, char ** argv){
             tm.iterateTree(ag);
         } else if(mode == "g") {
             tm.iterateGraph(dgp);
+            cout << endl;
         }
     }
 

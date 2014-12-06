@@ -83,7 +83,7 @@ private:
      */
     void initTemperatures(int layers, uint * centroids);
 
-    void init(SupportedImageWidths width, unsigned int layers,
+    void init(int input_image_width, unsigned int layers,
               unsigned int centroid_counts [], bool isUniform,
               int extRatio,  unsigned int layer_widths[]);
 
@@ -117,7 +117,7 @@ private:
 public:
 
     /** Builds a DeSTIN network
-      * @param width - width of the input image in pixels
+      * @param input_image_width - width of the input image in pixels
       * @param layers - number of layers in the heirarchy
       * @param centroid_counts - centroids per layer. Starts from the bottom layer.
       * @param isUniform - if nodes in a level share the same pool of centroids.
@@ -131,7 +131,7 @@ public:
       * 3) If neither of the two conditions do not apply, a runtime_error exception will be thrown.
       * @param imageMode - specify wheter using grascale or color images
       */
-    DestinNetworkAlt(SupportedImageWidths width, unsigned int layers,
+    DestinNetworkAlt(int input_image_width, unsigned int layers,
                      unsigned int centroid_counts [], bool isUniform,
                      unsigned int layer_widths[] = NULL,
                      DstImageMode imageMode = DST_IMG_MODE_GRAYSCALE);

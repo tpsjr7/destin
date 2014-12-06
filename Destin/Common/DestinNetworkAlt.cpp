@@ -23,7 +23,7 @@ float **** DestinNetworkAlt::getCentroidImages(){
     return centroidImages;
 }
 
-DestinNetworkAlt::DestinNetworkAlt(SupportedImageWidths width, unsigned int layers,
+DestinNetworkAlt::DestinNetworkAlt(int input_image_width, unsigned int layers,
                                    unsigned int centroid_counts [], bool isUniform,
                                    unsigned int layer_widths[],
                                    DstImageMode imageMode):
@@ -33,14 +33,14 @@ DestinNetworkAlt::DestinNetworkAlt(SupportedImageWidths width, unsigned int laye
         isUniform(isUniform),
         centroidImages(NULL),
         centroidImageWeightParameter(1.0),
-        inputImageWidth(width),
+        inputImageWidth(input_image_width),
         imageMode(imageMode)
         {
     int extRatio = getExtendRatio(imageMode);
-    init(width, layers, centroid_counts, isUniform, extRatio, layer_widths);
+    init(input_image_width, layers, centroid_counts, isUniform, extRatio, layer_widths);
 }
 
-void DestinNetworkAlt::init(SupportedImageWidths width, unsigned int layers,
+void DestinNetworkAlt::init(int input_image_width, unsigned int layers,
                             unsigned int centroid_counts [], bool isUniform,
                             int extRatio, unsigned int layer_widths[]){
     callback = NULL;
@@ -62,8 +62,8 @@ void DestinNetworkAlt::init(SupportedImageWidths width, unsigned int layers,
         std::copy(layer_widths, layer_widths + layers, dc->layerWidths);
     }
 
-    if(width % dc->layerWidths[0] == 0){
-        int ratio = width / dc->layerWidths[0];
+    if(input_image_width % dc->layerWidths[0] == 0){
+        int ratio = input_image_width / dc->layerWidths[0];
         dc->inputDim = ratio * ratio;
     } else {
         DestroyConfig(dc);
@@ -746,7 +746,6 @@ void DestinNetworkAlt::setPreviousBeliefDamping(float lambdaCoeff){
         destin->nodes[n].lambdaCoeff = lambdaCoeff;
     }
 }
-
 
 void DestinNetworkAlt::load(const char * fileName){
     if(centroidImages != NULL){
