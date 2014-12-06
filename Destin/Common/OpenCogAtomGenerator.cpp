@@ -67,28 +67,38 @@ public:
 
 
 
-class DestinGraphPrinter : public DestinGraphIteratorCallback {
+class DestinGraphNodePrinter : public DestinGraphIteratorCallback {
     std::ostream & out;
 
 public:
-    DestinGraphPrinter(std::ostream & out)
+    DestinGraphNodePrinter(std::ostream & out)
         :out(out){}
 
-    virtual void callback(const Node& node, const bool isBottom){
-        out << "n " << node.nIdx << " L_" << node.layer << "_W_" << node.winner << endl;
+    virtual void callback(const Node& node, const bool isBottom, uint * nodeIdToGraphNodeId){
+        out << "n " << nodeIdToGraphNodeId[node.nIdx] << " L_" << node.layer << "_W_" << node.winner << endl;
+        return;
+    }
+};
 
+class DestinGraphEdgePrinter : public DestinGraphIteratorCallback {
+    std::ostream & out;
+
+public:
+    DestinGraphEdgePrinter(std::ostream & out)
+        :out(out){}
+
+    virtual void callback(const Node& node, const bool isBottom, uint * nodeIdToGraphNodeId){
         if(isBottom){
             return;
         }
 
         const int nChildren = node.nChildren;
         for(int i = 0 ; i < nChildren; i++){
-            out << "e " << node.nIdx << " " << node.children[i]->nIdx << " child_edge_" << i << endl;
+            out << "e " << nodeIdToGraphNodeId[node.nIdx] << " " << nodeIdToGraphNodeId[node.children[i]->nIdx] << " child_edge_" << i << endl;
         }
         return;
     }
 };
-
 
 void usage(char ** argv){
     cout << argv[0] << " -t [a=atoms, g=graph] -l [layers 2 to 7] -tc [tree count] -w widths -c [centroids] -iw [img width]" << endl;
@@ -125,9 +135,6 @@ vector<uint> splitNumbers(char * strNums){
         c = strtok(NULL, ",");
     }
 
-    for(int i = 0 ; i < nums.size() ; i++){
-        cout << nums[i] << endl;
-    }
     return nums;
 }
 
@@ -194,7 +201,8 @@ int main(int argc, char ** argv){
     DestinTreeManager tm(dna, 0);
     AtomGenerator ag(std::cout);
 
-    DestinGraphPrinter dgp(std::cout);
+    DestinGraphNodePrinter np(std::cout);
+    DestinGraphEdgePrinter ep(std::cout);
 
     for(int i = 0 ; i < trees ; i++){
         vs.grab();
@@ -203,7 +211,8 @@ int main(int argc, char ** argv){
         if(mode == "a"){
             tm.iterateTree(ag);
         } else if(mode == "g") {
-            tm.iterateGraph(dgp);
+            tm.iterateGraph(np);
+            tm.iterateGraph(ep);
             cout << endl;
         }
     }

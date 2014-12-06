@@ -2,6 +2,17 @@
 #include "DestinTreeManager.h"
 #include <vector>
 
+class InitDestinGraphCallback : public DestinGraphIteratorCallback {
+    int count;
+public:
+    InitDestinGraphCallback():count(0){}
+
+    void callback(const Node& node, bool isBottom, uint * nodeIdToGraphNodeId){
+        nodeIdToGraphNodeId[node.nIdx] = count;
+        count++;
+    }
+};
+
 DestinTreeManager::DestinTreeManager(DestinNetworkAlt & destin, int bottom)
     :destin(destin), nLayers(destin.getLayerCount()), winnerTree(NULL)
 {
@@ -14,12 +25,21 @@ DestinTreeManager::DestinTreeManager(DestinNetworkAlt & destin, int bottom)
             throw std::domain_error("DestinTreeManager: too many centroids\n.");
         }
     }
+    nodeIdToGraphNodeId = new uint[destin.getNetwork()->nNodes];
+
+    InitDestinGraphCallback cb;
+    iterateGraph(cb);
 }
 
 DestinTreeManager::~DestinTreeManager(){
     if(winnerTree!=NULL){
         delete [] winnerTree;
         winnerTree = NULL;
+    }
+
+    if(nodeIdToGraphNodeId != NULL){
+        delete [] nodeIdToGraphNodeId;
+        nodeIdToGraphNodeId = NULL;
     }
 }
 
@@ -80,7 +100,8 @@ void DestinTreeManager::iterateTree(DestinTreeIteratorCallback& callback){
     return;
 }
 
-void DestinTreeManager::iterateGraphHelper(DestinGraphIteratorCallback & callback, const Node * parent, std::vector<bool> & nodesVisited){
+void DestinTreeManager::iterateGraphHelper(DestinGraphIteratorCallback & callback,
+                                           const Node * parent, std::vector<bool> & nodesVisited){
     if(nodesVisited[parent->nIdx]){
         return; // already visited
     } else {
@@ -89,7 +110,7 @@ void DestinTreeManager::iterateGraphHelper(DestinGraphIteratorCallback & callbac
 
     bool isBottom = parent->layer <= bottomLayer || parent->children == NULL;
 
-    callback.callback(*parent, isBottom);
+    callback.callback(*parent, isBottom, nodeIdToGraphNodeId);
     if(!isBottom){
         for(int i = 0 ; i < parent->nChildren ; i++){
             iterateGraphHelper(callback, parent->children[i], nodesVisited);

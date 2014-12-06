@@ -23,6 +23,8 @@ class DestinTreeManager {
     int bottomLayer;
     const int nLayers;
 
+    uint * nodeIdToGraphNodeId;
+
     CMOrderedTreeMinerWrapper tmw; //tree miner wrapper
     vector<PatternTree> foundSubtrees; //list of trees that were found during subtree mining.
 
