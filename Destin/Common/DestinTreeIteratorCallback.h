@@ -14,7 +14,7 @@ class DestinGraphIteratorCallback
 {
 public:
     virtual ~DestinGraphIteratorCallback(){}
-    virtual void callback(const Node& node, bool isBottom, uint * nodeIdToGraphNodeId) = 0;
+    virtual void callback(const Node& node, bool isBottom, const uint * nodeIdToGraphNodeId) = 0;
 };
 
 #endif // DESTINTREEITERATORCALLBACK_H

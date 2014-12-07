@@ -725,6 +725,9 @@ void SaveDestin( Destin *d, const char *filename )
     fclose(dFile);
 }
 
+// Loads destin from the given file.
+// Destroys passed in destin, returns new destin
+// Returns NULL if could not load.
 Destin * LoadDestin( Destin *d, const char *filename )
 {
     FILE *dFile;

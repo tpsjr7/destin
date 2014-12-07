@@ -33,11 +33,20 @@ DestinNetworkAlt::DestinNetworkAlt(int input_image_width, unsigned int layers,
         isUniform(isUniform),
         centroidImages(NULL),
         centroidImageWeightParameter(1.0),
-        inputImageWidth(input_image_width),
         imageMode(imageMode)
         {
+    this->callback = NULL;
     int extRatio = getExtendRatio(imageMode);
     init(input_image_width, layers, centroid_counts, isUniform, extRatio, layer_widths);
+}
+
+DestinNetworkAlt::DestinNetworkAlt(const char *fileName){
+    this->destin = NULL;
+    this->temperatures = NULL;
+    this->centroidImages = NULL;
+    this->callback = NULL;
+    this->load(fileName);
+    this->setIsTraining(true);
 }
 
 void DestinNetworkAlt::init(int input_image_width, unsigned int layers,
@@ -76,7 +85,7 @@ void DestinNetworkAlt::init(int input_image_width, unsigned int layers,
     std::copy(temperatures, temperatures + layers, dc->temperatures);
 
     destin = InitDestinWithConfig(dc);
-    if(destin == NULL){
+    if( destin == NULL){
         throw std::runtime_error("Could not create the destin structure. Perhaps the given layer widths is not supported.");
     }
 
@@ -86,7 +95,7 @@ void DestinNetworkAlt::init(int input_image_width, unsigned int layers,
     ClearBeliefs(destin);
     SetLearningStrat(destin, CLS_FIXED);
     destin->fixedLearnRate = 0.1;
-    isTraining(true);
+    setIsTraining(true);
 }
 
 // 2013.7.4
@@ -633,7 +642,7 @@ void DestinNetworkAlt::doDestin(float * input_array ) {
     }
 }
 
-void DestinNetworkAlt::isTraining(bool isTraining) {
+void DestinNetworkAlt::setIsTraining(bool isTraining) {
     this->training = isTraining;
     for(int l = 0 ; l < destin->nLayers ; l++){
        destin->layerMask[l] = isTraining ? 1 : 0;
@@ -758,12 +767,10 @@ void DestinNetworkAlt::load(const char * fileName){
         throw std::runtime_error("load: could not open destin file.\n");
     }
 
-
     Node * n = GetNodeFromDestin(destin, 0, 0, 0);
     this->gamma = n->gamma;
     this->isUniform = destin->isUniform;
     this->lambdaCoeff = n->lambdaCoeff;
-
     if(temperatures != NULL){
         delete [] temperatures;
     }

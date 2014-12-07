@@ -5,7 +5,7 @@
 class InitDestinGraphCallback : public DestinGraphIteratorCallback {
     int count;
 public:
-    InitDestinGraphCallback():count(0){}
+    InitDestinGraphCallback():count(1){}
 
     void callback(const Node& node, bool isBottom, uint * nodeIdToGraphNodeId){
         nodeIdToGraphNodeId[node.nIdx] = count;
@@ -397,7 +397,7 @@ void DestinTreeManager::drawSubtreeBordersOntoImage(int foundSubtree, cv::Mat & 
     /// this block draws the border of the found subtree
     cv::Scalar blue(255,0,0); //BGR color
     uint * layer_widths =  destin.getNetwork()->layerWidth;
-    int imageWidth = destin.getInputImageWidth();
+    int imageWidth = sqrt(destin.getNetwork()->inputImageSize);
     for(int i = 0 ; i < locations.size() ; i++){
         // find the node location of the subtree
         NodeLocation & nl = convertNodeLocation.at(locations[i]);

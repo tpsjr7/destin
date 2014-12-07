@@ -165,7 +165,7 @@ ArgConfig parseArgs(int argc, char ** argv){
             config.mode = string(args.at(arg));
         } else if(argString == "--widths"){
             config.widths = splitNumbers(args.at(arg));
-        } else if(argString == "-cents"){
+        } else if(argString == "--cents"){
             config.centroids = splitNumbers(args.at(arg));
         } else if(argString == "--layers"){
             config.layers = atoi(args.at(arg));
@@ -184,6 +184,9 @@ ArgConfig parseArgs(int argc, char ** argv){
             arg--;//doesn't take a value
         } else if(argString == "--out"){
             config.outputFile = args.at(arg);
+        } else {
+            cerr << "Invalid argument " << argString << endl;
+            exit(1);
         }
         arg++;
     }
@@ -215,7 +218,7 @@ int main(int argc, char ** argv){
     }
 
     int width = config.imgWidth;
-    DestinNetworkAlt dna(width, config.layers,  &config.centroids[0], true, &config.widths[0]);
+    DestinNetworkAlt * dna = NULL;
 
     VideoSource vs(false,"../Bindings/Python/moving_square.m4v");
     vs.setSize(width,width);
@@ -224,20 +227,30 @@ int main(int argc, char ** argv){
     }
 
     if(config.load == ""){
+        dna  = new DestinNetworkAlt(width, config.layers,  &config.centroids[0], true, &config.widths[0]);
         cout << "Training " << config.trainFrames << " frames..." << endl;
 
         for(int i = 0 ; i < config.trainFrames ; i++){
-            cout << ".";
             vs.grab();
-            dna.doDestin(vs.getOutput());
+            dna->doDestin(vs.getOutput());
+            if(i % 10 == 0){
+                cout << i << " Q: " << dna->getQuality(config.layers - 1) << endl;
+            }
         }
         cout << endl << "Done training." << endl;
     } else {
-        dna.load(config.load.c_str());
+        dna = new DestinNetworkAlt(config.load.c_str());
         cout << "Loaded: " << config.load << endl;
+        int size = dna->getNetwork()->inputImageSize;
+        if(width * width != size){
+            int new_width = (int)sqrt(size);
+            cout << "Input image size overridden to " << new_width << " pixels wide from " << width << endl;
+            width = new_width;
+            vs.setSize(width,width);
+        }
     }
 
-    DestinTreeManager tm(dna, 0);
+    DestinTreeManager tm(*dna, 0);
 
     AtomGenerator ag(*out_stream);
 
@@ -249,21 +262,21 @@ int main(int argc, char ** argv){
         if(!vs.grab()){
             vs.grab(); // try again if at the end of the video
         }
-        dna.doDestin(vs.getOutput());
+        dna->doDestin(vs.getOutput());
 
         if(config.mode == "a"){
             tm.iterateTree(ag);
         } else if(config.mode == "g") {
             tm.iterateGraph(np);
             tm.iterateGraph(ep);
-            cout << endl;
+            *out_stream << endl;
         }
     }
 
     if(config.save != ""){
-        dna.save(config.save.c_str());
+        dna->save(config.save.c_str());
     }
-
+    delete dna;
     if(config.outputFile != ""){
         fs.close();
     }

@@ -71,7 +71,6 @@ private:
 
     float **** centroidImages;
     bool isUniform;
-    const int inputImageWidth;
 
     DstImageMode imageMode; //Grayscale or color input
 
@@ -136,6 +135,8 @@ public:
                      unsigned int layer_widths[] = NULL,
                      DstImageMode imageMode = DST_IMG_MODE_GRAYSCALE);
 
+    DestinNetworkAlt(const char * fileName);
+
     virtual ~DestinNetworkAlt();
 
     /** Runs the DeSTIN algorithm on the float array input.
@@ -144,10 +145,6 @@ public:
       * into the DestinNetworkAlt constructor.
       */
     void doDestin(float * input_array);
-
-    int getInputImageWidth(){
-        return inputImageWidth;
-    }
 
     float**** getCentroidImages();
 
@@ -172,7 +169,7 @@ public:
     void rescaleCentroid(int srcLayer, int idx, int dstLayer);
 
 
-    void isTraining(bool isTraining);
+    void setIsTraining(bool isTraining);
 
     bool isTraining() {
         return training;
@@ -188,7 +185,7 @@ public:
     }
 
     void setIsPOSTraining(bool training) {
-        isTraining(training);
+        setIsTraining(training);
     }
 
     void setIsPSSATraining(bool no_op) {
