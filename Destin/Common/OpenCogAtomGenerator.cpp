@@ -75,7 +75,7 @@ public:
         :out(out){}
 
     virtual void callback(const Node& node, const bool isBottom, uint * nodeIdToGraphNodeId){
-        out << "n " << nodeIdToGraphNodeId[node.nIdx] << " L_" << node.layer << "_W_" << node.winner << endl;
+        out << "v " << nodeIdToGraphNodeId[node.nIdx] << " L_" << node.layer << "_W_" << node.winner << endl;
         return;
     }
 };

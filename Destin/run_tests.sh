@@ -9,6 +9,7 @@ tests="
 ./TreeMining/testTreeMiner
 ./DavisDestin/run_test.sh
 ./Bindings/Python/test.sh
+./Common/testDestinNetworkAlt
 "
 
 all_pass="yes"
