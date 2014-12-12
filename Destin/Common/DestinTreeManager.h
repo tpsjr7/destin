@@ -76,7 +76,7 @@ public:
       * only a tree with depth 1, i.e. just the root node is used.
       * Smaller trees are mined faster.
       */
-    DestinTreeManager(DestinNetworkAlt & destin, int bottom);
+    DestinTreeManager(DestinNetworkAlt & destin, int bottom, char labelMode='g');
 
     ~DestinTreeManager();
 

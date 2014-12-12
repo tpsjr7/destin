@@ -65,27 +65,38 @@ public:
 
 };
 
-
-
-class DestinGraphNodePrinter : public DestinGraphIteratorCallback {
+class DestinGraphPrinter : public DestinGraphIteratorCallback {
+protected:
     std::ostream & out;
-
+    char labelMode;
+    int layers;
+    const int layerSpace;
 public:
-    DestinGraphNodePrinter(std::ostream & out)
-        :out(out){}
+    DestinGraphPrinter(std::ostream & out, char labelMode, int layers)
+        :out(out), labelMode(labelMode), layers(layers), layerSpace(1000000 / layers){}
+
+};
+
+class DestinGraphNodePrinter : public DestinGraphPrinter {
+public:
+    DestinGraphNodePrinter(std::ostream & out, char labelMode, int layers)
+        :DestinGraphPrinter(out, labelMode, layers) {}
 
     virtual void callback(const Node& node, const bool isBottom, uint * nodeIdToGraphNodeId){
-        out << "v " << nodeIdToGraphNodeId[node.nIdx] << " L_" << node.layer << "_W_" << node.winner << endl;
+        out << "v " << nodeIdToGraphNodeId[node.nIdx];
+        if(labelMode == 'g'){
+            out << " " << (layerSpace * node.layer + node.winner) << endl;
+        } else if(labelMode == 'm'){
+            out << " L_" << node.layer << "_W_" << node.winner << endl;
+        }
         return;
     }
 };
 
-class DestinGraphEdgePrinter : public DestinGraphIteratorCallback {
-    std::ostream & out;
-
+class DestinGraphEdgePrinter : public DestinGraphPrinter {
 public:
-    DestinGraphEdgePrinter(std::ostream & out)
-        :out(out){}
+    DestinGraphEdgePrinter(std::ostream & out, char labelMode, int layers)
+         :DestinGraphPrinter(out, labelMode, layers) {}
 
     virtual void callback(const Node& node, const bool isBottom, uint * nodeIdToGraphNodeId){
         if(isBottom){
@@ -93,8 +104,14 @@ public:
         }
 
         const int nChildren = node.nChildren;
-        for(int i = 0 ; i < nChildren; i++){
-            out << "e " << nodeIdToGraphNodeId[node.nIdx] << " " << nodeIdToGraphNodeId[node.children[i]->nIdx] << " child_edge_" << i << endl;
+        if(labelMode == 'g'){
+            for(int i = 0 ; i < nChildren; i++){
+                out << "e " << nodeIdToGraphNodeId[node.nIdx] << " " << nodeIdToGraphNodeId[node.children[i]->nIdx] << " " << i << endl;
+            }
+        } else if(labelMode == 'm'){
+            for(int i = 0 ; i < nChildren; i++){
+                out << "e " << nodeIdToGraphNodeId[node.nIdx] << " " << nodeIdToGraphNodeId[node.children[i]->nIdx] << " child_edge_" << i << endl;
+            }
         }
         return;
     }
@@ -115,8 +132,8 @@ vector<uint> splitNumbers(char * strNums){
 void usage(char ** argv){
     cout << argv[0] << " --mode [a=atoms, g=graph] --layers [layers] --n-out [count] " << endl
                     << "--widths widths --cents [centroids] --img-width [img width]" << endl
-                    << "<--load [filename]> <--save [filename]> <--hide-video> <--train-frames [frames=50]>" << endl
-                    << "<--out filename>" << endl
+                    << "< --load [filename] > < --save [filename] > < --hide-video > < --train-frames [frames=50] >" << endl
+                    << "< --out filename > < --label-mode=m|g >" << endl
                        ;
 }
 
@@ -127,6 +144,7 @@ struct ArgConfig {
         centroids = vector<uint>(the_centroids, the_centroids + 3);
 
         imgWidth = 16;
+        labelMode = 'g';
         layers = 3;
         load = "";
         mode = "g";
@@ -139,6 +157,8 @@ struct ArgConfig {
     }
 
     vector<uint>    centroids;
+    int             imgWidth;
+    char            labelMode;
     int             layers;
     string          load;
     string          mode;
@@ -148,7 +168,6 @@ struct ArgConfig {
     int             trainFrames;
     int             treeCount;
     vector<uint>    widths;
-    int             imgWidth;
 };
 
 ArgConfig parseArgs(int argc, char ** argv){
@@ -184,6 +203,18 @@ ArgConfig parseArgs(int argc, char ** argv){
             arg--;//doesn't take a value
         } else if(argString == "--out"){
             config.outputFile = args.at(arg);
+        } else if(argString == "--label-mode"){
+            char mode = args.at(arg)[0];
+            switch(mode){
+                case 'm':
+                case 'g':
+                    break;
+                default:
+                    cerr << "Invalid label mode." << endl;
+                    exit(1);
+            };
+
+            config.labelMode = mode;
         } else {
             cerr << "Invalid argument " << argString << endl;
             exit(1);
@@ -250,12 +281,13 @@ int main(int argc, char ** argv){
         }
     }
 
-    DestinTreeManager tm(*dna, 0);
+    DestinTreeManager tm(*dna, 0, config.labelMode);
 
     AtomGenerator ag(*out_stream);
+    DestinGraphNodePrinter np(*out_stream, config.labelMode, config.layers);
+    DestinGraphEdgePrinter ep(*out_stream, config.labelMode, config.layers);
 
-    DestinGraphNodePrinter np(*out_stream);
-    DestinGraphEdgePrinter ep(*out_stream);
+    dna->setIsTraining(false);
 
     for(int i = 0 ; i <  config.treeCount ; i++){
 
@@ -267,9 +299,14 @@ int main(int argc, char ** argv){
         if(config.mode == "a"){
             tm.iterateTree(ag);
         } else if(config.mode == "g") {
+            if(config.labelMode == 'g'){
+                *out_stream << "# t 1" << endl;
+            }
             tm.iterateGraph(np);
             tm.iterateGraph(ep);
-            *out_stream << endl;
+            if(i < config.treeCount - 1){
+                *out_stream << endl; // avoid an empty line at the end of the file
+            }
         }
     }
 

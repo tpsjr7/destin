@@ -5,7 +5,7 @@
 class InitDestinGraphCallback : public DestinGraphIteratorCallback {
     int count;
 public:
-    InitDestinGraphCallback():count(1){}
+    InitDestinGraphCallback(int startCount):count(startCount){}
 
     void callback(const Node& node, bool isBottom, uint * nodeIdToGraphNodeId){
         nodeIdToGraphNodeId[node.nIdx] = count;
@@ -13,7 +13,7 @@ public:
     }
 };
 
-DestinTreeManager::DestinTreeManager(DestinNetworkAlt & destin, int bottom)
+DestinTreeManager::DestinTreeManager(DestinNetworkAlt & destin, int bottom, char labelMode)
     :destin(destin), nLayers(destin.getLayerCount()), winnerTree(NULL)
 {
     maxChildrenPerParent = 0; // updated in setBottomLayer
@@ -27,7 +27,7 @@ DestinTreeManager::DestinTreeManager(DestinNetworkAlt & destin, int bottom)
     }
     nodeIdToGraphNodeId = new uint[destin.getNetwork()->nNodes];
 
-    InitDestinGraphCallback cb;
+    InitDestinGraphCallback cb(labelMode == 'g' ? 0 : 1);
     iterateGraph(cb);
 }
 
