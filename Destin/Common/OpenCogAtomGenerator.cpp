@@ -133,7 +133,7 @@ void usage(char ** argv){
     cout << argv[0] << " --mode [a=atoms, g=graph] --layers [layers] --n-out [count] " << endl
                     << "--widths widths --cents [centroids] --img-width [img width]" << endl
                     << "< --load [filename] > < --save [filename] > < --hide-video > < --train-frames [frames=50] >" << endl
-                    << "< --out filename > < --label-mode=m|g >" << endl
+                    << "< --out filename > < --label-mode [m=moss, g=grami] >" << endl
                        ;
 }
 
