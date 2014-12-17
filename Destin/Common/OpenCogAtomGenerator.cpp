@@ -132,8 +132,8 @@ vector<uint> splitNumbers(char * strNums){
 void usage(char ** argv){
     cout << argv[0] << " --mode [a=atoms, g=graph] --layers [layers] --n-out [count] " << endl
                     << "--widths widths --cents [centroids] --img-width [img width]" << endl
-                    << "< --load [filename] > < --save [filename] > < --hide-video > < --train-frames [frames=50] >" << endl
-                    << "< --out filename > < --label-mode [m=moss, g=grami] >" << endl
+                    << "< --load [network filename] > < --save [network filename] > < --hide-video > < --train-frames [frames=50] >" << endl
+                    << "< --out filename > < --label-mode [m=moss, g=grami] > <--sample-period [=1]>" << endl
                        ;
 }
 
@@ -143,6 +143,7 @@ struct ArgConfig {
         uint the_centroids[] = {5,5,5};
         centroids = vector<uint>(the_centroids, the_centroids + 3);
 
+        frameSamplePeriod = 1;
         imgWidth = 16;
         labelMode = 'g';
         layers = 3;
@@ -157,6 +158,7 @@ struct ArgConfig {
     }
 
     vector<uint>    centroids;
+    int             frameSamplePeriod;
     int             imgWidth;
     char            labelMode;
     int             layers;
@@ -215,6 +217,8 @@ ArgConfig parseArgs(int argc, char ** argv){
             };
 
             config.labelMode = mode;
+        } else if(argString == "--sample-period"){
+            config.frameSamplePeriod = atoi(args.at(arg));
         } else {
             cerr << "Invalid argument " << argString << endl;
             exit(1);
@@ -291,8 +295,10 @@ int main(int argc, char ** argv){
 
     for(int i = 0 ; i <  config.treeCount ; i++){
 
-        if(!vs.grab()){
-            vs.grab(); // try again if at the end of the video
+        for(int j = 0 ; j < config.frameSamplePeriod ; j++){ // skip some frames if specified
+            if(!vs.grab()){
+                vs.grab(); // try again if at the end of the video
+            }
         }
         dna->doDestin(vs.getOutput());
 
@@ -300,13 +306,13 @@ int main(int argc, char ** argv){
             tm.iterateTree(ag);
         } else if(config.mode == "g") {
             if(config.labelMode == 'g'){
-                *out_stream << "# t 1" << endl;
+                *out_stream << "# t " << (i + 1) << endl;
             }
             tm.iterateGraph(np);
             tm.iterateGraph(ep);
-            if(i < config.treeCount - 1){
-                *out_stream << endl; // avoid an empty line at the end of the file
-            }
+//            if(i < config.treeCount - 1){
+//                *out_stream << endl; // avoid an empty line at the end of the file
+//            }
         }
     }
 
