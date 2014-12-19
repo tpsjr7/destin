@@ -40,11 +40,6 @@ def callback(event,x,y,flags,param):
         out_features.flush()
         showFrame()
 
-cv2.namedWindow('frame')
-cv2.setMouseCallback('frame',callback)
-
-showFrame()
-
 def capture():
     while(True):
         wk = cv2.waitKey(1)
@@ -76,8 +71,30 @@ def record_cam(frames = 300):
     		cv2.waitKey(1)
 	vw.release()
 
+# tests how fast it can play a video shuffled
+def playShuffle():
+    vc = cv2.VideoCapture("finger.mov")
+    ri = range(100)
+    import random
+    random.shuffle(ri)
+    for i in ri:
+        vc.set(cv2.cv.CV_CAP_PROP_POS_FRAMES, i)
+        ret, frame = vc.read()
+        if frame != None:
+            cv2.imshow('frame2', frame)
+            cv2.waitKey(1)
+
+def labler():
+    cv2.namedWindow('frame')
+    cv2.setMouseCallback('frame',callback)
+    showFrame()
+    capture()
+
+#playShuffle()
+
+labler()
 #record_cam()
-capture()
+#capture()
 # When everything done, release the capture
 #cap.release()
 #cv2.destroyAllWindows()

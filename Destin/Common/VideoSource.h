@@ -149,6 +149,15 @@ public:
         this->flip = isFlipped;
     }
 
+    /**
+     * Sets the next video frame to play
+     * @brief setNextFrame
+     * @param frame_num
+     */
+    void setNextFrame(int frame_num){
+        cap->set(CV_CAP_PROP_POS_FRAMES, frame_num);
+    }
+
 	~VideoSource() {
 		delete cap;
 		delete [] float_frame;
@@ -213,7 +222,7 @@ public:
 	 */
 	bool grab();
 
-    /** rewinds the video
+    /** rewinds the video to the begining
      *  @return - true if it did rewind false otherwise
      */
     bool rewind();
