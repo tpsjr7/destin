@@ -4,9 +4,12 @@
 #include "DestinTreeIteratorCallback.h"
 #include "DestinNetworkAlt.h"
 #include "VideoSource.h"
+#include "BeliefExporter.h"
 #include <ostream>
 
 using std::endl;
+
+struct ArgConfig;
 
 class AtomGenerator : public DestinTreeIteratorCallback {
     std::ostream& output;
@@ -117,10 +120,31 @@ public:
     }
 };
 
+// Interface of classes that export destin data each iteration
+class OutputStep {
+protected:
+    DestinNetworkAlt & dn;
+public:
+    OutputStep(DestinNetworkAlt & dn):dn(dn){}
+    virtual ~OutputStep(){}
+    virtual void run(int iteration) = 0;
+};
+
+class TrainNNStep : public OutputStep {
+
+    BeliefExporter & be;
+
+    TrainNNStep(DestinNetworkAlt & dn, BeliefExporter & be)
+        :OutputStep(dn), be(be){}
+
+    virtual void run(int iteration){
+
+    }
+};
+
 // convert string of comma seperated numbers into an array
 vector<uint> splitNumbers(char * strNums){
-    char * c;
-    c = strtok(strNums,",");
+    char * c = strtok(strNums,",");
     vector<uint> nums;
     while(c != NULL){
         nums.push_back(atoi(c));
@@ -130,11 +154,26 @@ vector<uint> splitNumbers(char * strNums){
 }
 
 void usage(char ** argv){
-    cout << argv[0] << " --mode [a=atoms, g=graph] --layers [layers] --n-out [count] " << endl
-                    << "--widths widths --cents [centroids] --img-width [img width]" << endl
-                    << "< --load [network filename] > < --save [network filename] > < --hide-video > < --train-frames [frames=50] >" << endl
-                    << "< --out filename > < --label-mode [m=moss, g=grami] > <--sample-period [=1]>" << endl
-                       ;
+    stringstream ss; ss << endl << '\t';
+    string end(ss.str());
+
+    cout << argv[0] << end
+    << "[--cents (5,5,5)]" << end
+    << "[--features-out-mode a=atoms, (g=graph), n=neural network]" << end
+    << "[--frames-sample-period (1)]" << end
+    << "[--hide-video]" << end
+    << "[--input-video (moving_square.m4v)]" << end
+    << "[--img-width (16)]" << end
+    << "[--label-mode m=moss, (g=grami)]" << end
+    << "[--layers (3)]" << end
+    << "[--layer-widths (4,2,1)]" << end
+    << "[--load <filename>]" << end
+    << "[--n-features-out (1)]" << end
+    << "[--out-features <filename (stdout)>]" << end
+    << "[--save <filename>]" << end
+    << "[--train-frames (50)]" << end
+    << "[--train-in-stages]" << end
+    ;
 }
 
 struct ArgConfig {
@@ -143,33 +182,38 @@ struct ArgConfig {
         uint the_centroids[] = {5,5,5};
         centroids = vector<uint>(the_centroids, the_centroids + 3);
 
-        frameSamplePeriod = 1;
+        framesSamplePeriod = 1;
         imgWidth = 16;
         labelMode = 'g';
         layers = 3;
+        uint the_width[] = {4,2,1};
+        layerWidths = vector<uint>(the_width, the_width + 3);
         load = "";
-        mode = "g";
+        featuresMode = "g";
         outputFile = "";
+        save = "";
         showVid = true;
         trainFrames = 50;
-        treeCount = 1;
-        uint the_width[] = {4,2,1};
-        widths = vector<uint>(the_width, the_width + 3);
+        trainInStages = 0;
+        nFeaturesOut = 1;
+        inputVideoFileIn = "../Bindings/Python/moving_square.m4v";
     }
 
     vector<uint>    centroids;
-    int             frameSamplePeriod;
+    int             framesSamplePeriod;
     int             imgWidth;
+    string          inputVideoFileIn;
     char            labelMode;
     int             layers;
+    vector<uint>    layerWidths;
     string          load;
-    string          mode;
+    string          featuresMode;
     string          outputFile;
     string          save;
     bool            showVid;
     int             trainFrames;
-    int             treeCount;
-    vector<uint>    widths;
+    bool            trainInStages;
+    int             nFeaturesOut;
 };
 
 ArgConfig parseArgs(int argc, char ** argv){
@@ -182,16 +226,16 @@ ArgConfig parseArgs(int argc, char ** argv){
         string argString(args.at(arg));
 
         arg++;
-        if(argString == "--mode"){
-            config.mode = string(args.at(arg));
-        } else if(argString == "--widths"){
-            config.widths = splitNumbers(args.at(arg));
+        if(argString == "--features-out-mode"){
+            config.featuresMode = string(args.at(arg));
+        } else if(argString == "--layer-widths"){
+            config.layerWidths = splitNumbers(args.at(arg));
         } else if(argString == "--cents"){
             config.centroids = splitNumbers(args.at(arg));
         } else if(argString == "--layers"){
             config.layers = atoi(args.at(arg));
-        } else if(argString == "--n-out"){
-            config.treeCount =  atoi(args.at(arg));
+        } else if(argString == "--n-features-out"){
+            config.nFeaturesOut =  atoi(args.at(arg));
         } else if(argString == "--img-width"){
             config.imgWidth = atoi(args.at(arg));
         } else if(argString == "--load"){
@@ -203,7 +247,7 @@ ArgConfig parseArgs(int argc, char ** argv){
         } else if(argString == "--hide-video"){
             config.showVid = false;
             arg--;//doesn't take a value
-        } else if(argString == "--out"){
+        } else if(argString == "--out-features"){
             config.outputFile = args.at(arg);
         } else if(argString == "--label-mode"){
             char mode = args.at(arg)[0];
@@ -215,10 +259,14 @@ ArgConfig parseArgs(int argc, char ** argv){
                     cerr << "Invalid label mode." << endl;
                     exit(1);
             };
-
             config.labelMode = mode;
-        } else if(argString == "--sample-period"){
-            config.frameSamplePeriod = atoi(args.at(arg));
+        } else if(argString == "--frames-sample-period"){
+            config.framesSamplePeriod = atoi(args.at(arg));
+        } else if(argString == "--train-in-stages"){
+            config.trainInStages = true;
+            arg--; // doesn't take a value;
+        } else if(argString == "--input-video"){
+            config.inputVideoFileIn = args.at(arg);
         } else {
             cerr << "Invalid argument " << argString << endl;
             exit(1);
@@ -227,6 +275,35 @@ ArgConfig parseArgs(int argc, char ** argv){
     }
 
     return config;
+}
+
+struct ReportConfig {
+
+    ReportConfig(VideoSource & vs, DestinNetworkAlt * dna, ArgConfig & config)
+        :vs(vs), dna(dna), arg_config(config){
+        interval = 10;
+        trainStage = 0;
+        iteration = 0;
+        num_iterations = 0;
+    }
+
+    const ArgConfig & arg_config;
+    DestinNetworkAlt * dna;
+    int interval;
+    int iteration;
+    int num_iterations;
+    int trainStage;
+    VideoSource&  vs;
+};
+
+void processFrame(ReportConfig & rc){
+    DestinNetworkAlt * dna = rc.dna;
+    rc.vs.grab();
+    dna->doDestin(rc.vs.getOutput());
+    if(rc.iteration % rc.interval == 0){
+        cout << "Stage: " <<  rc.trainStage << " I: " << rc.iteration << " of " << rc.num_iterations << " Q: " << rc.dna->getQuality(rc.arg_config.layers - 1) << endl;
+    }
+    return;
 }
 
 int main(int argc, char ** argv){
@@ -255,25 +332,40 @@ int main(int argc, char ** argv){
     int width = config.imgWidth;
     DestinNetworkAlt * dna = NULL;
 
-    VideoSource vs(false,"../Bindings/Python/moving_square.m4v");
+    VideoSource vs(false, config.inputVideoFileIn);
+
     vs.setSize(width,width);
     if(config.showVid){
         vs.enableDisplayWindow();
     }
 
-    if(config.load == ""){
-        dna  = new DestinNetworkAlt(width, config.layers,  &config.centroids[0], true, &config.widths[0]);
+    ReportConfig rc(vs, dna, config);
+
+    if(config.load == ""){ // don't load, train.
+        dna  = new DestinNetworkAlt(width, config.layers,  &config.centroids[0], true, &config.layerWidths[0]);
         cout << "Training " << config.trainFrames << " frames..." << endl;
 
-        for(int i = 0 ; i < config.trainFrames ; i++){
-            vs.grab();
-            dna->doDestin(vs.getOutput());
-            if(i % 10 == 0){
-                cout << i << " Q: " << dna->getQuality(config.layers - 1) << endl;
+        if(config.trainInStages){
+            dna->setIsTraining(false);
+            for(int layer = 0; layer < config.layers ; layer++){
+                if(layer > 0){
+                    dna->setLayerIsTraining(layer - 1, false); // freeze previous layer
+                }
+                dna->setLayerIsTraining(layer, true); // enable the layer, disable previous layer
+                rc.trainStage = layer;
+                for(int i = 0 ; i < config.trainFrames ; i++){
+                    rc.iteration = i;
+                    processFrame(rc);
+                }
+            }
+        } else {
+            for(int i = 0 ; i < config.trainFrames ; i++){
+                rc.iteration = i;
+                processFrame(rc);
             }
         }
         cout << endl << "Done training." << endl;
-    } else {
+    } else { // Load a saved network instead of training one
         dna = new DestinNetworkAlt(config.load.c_str());
         cout << "Loaded: " << config.load << endl;
         int size = dna->getNetwork()->inputImageSize;
@@ -293,18 +385,18 @@ int main(int argc, char ** argv){
 
     dna->setIsTraining(false);
 
-    for(int i = 0 ; i <  config.treeCount ; i++){
+    for(int i = 0 ; i <  config.nFeaturesOut ; i++){
 
-        for(int j = 0 ; j < config.frameSamplePeriod ; j++){ // skip some frames if specified
+        for(int j = 0 ; j < config.framesSamplePeriod ; j++){ // skip some frames if specified
             if(!vs.grab()){
                 vs.grab(); // try again if at the end of the video
             }
         }
         dna->doDestin(vs.getOutput());
 
-        if(config.mode == "a"){
+        if(config.featuresMode == "a"){
             tm.iterateTree(ag);
-        } else if(config.mode == "g") {
+        } else if(config.featuresMode == "g") {
             if(config.labelMode == 'g'){
                 *out_stream << "# t " << (i + 1) << endl;
             }

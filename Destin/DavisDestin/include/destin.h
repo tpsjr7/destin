@@ -71,7 +71,7 @@ typedef struct Destin {
 
     float       ** uf_starv;            // shared centroids starvation
 
-    int         inputImageSize;         // d->layerSize[0] * d->nci[0]
+    int         inputImageSize;         // d->layerSize[0] * d->nci[0] = number of pixels in the image (x3 if is color)
 
     /* Extend the input size by this integer amount.
        Used for example to take in 2 images for stero vision for example,

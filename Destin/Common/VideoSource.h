@@ -93,7 +93,7 @@ public:
 	 */
 	VideoSource(bool use_device, std::string video_file, int dev_no = 0) :
         target_size(512, 512), edge_detection(false), showWindow(false),
-        isShowColor(false), flip(true), isDevice(use_device),
+        isShowColor(false), flip(false), isDevice(use_device),
         win_title("DeSTIN Input Video") {
 
 		float_frame = new float[target_size.area()];
@@ -154,7 +154,7 @@ public:
      * @brief setNextFrame
      * @param frame_num
      */
-    void setNextFrame(int frame_num){
+    void setFrame(int frame_num){
         cap->set(CV_CAP_PROP_POS_FRAMES, frame_num);
     }
 
@@ -183,10 +183,46 @@ public:
 		return float_frame;
 	}
 
-    cv::Mat getOutput_c1() {
-        //return greyscaled_frame;
-        return original_frame;
-        //return flipped_frame;
+    /**
+     * Gets the grayscale image as normalized float array (values between 0 and 1)
+     * Can be called in python bindings as pd.getOutputNumpy() which will return a numpy array.
+     * This array will only be valid as long as this VideoSource object has not been destroyed.
+     * See note at http://docs.scipy.org/doc/numpy/reference/swig.interface-file.html#argout-view-arrays
+     */
+    void getOutputNumpy(int* size, float** output ){
+        *size = target_size.width * target_size.height;
+        *output = float_frame;
+    }
+
+    /**
+     * Gets the grayscale image as array of unsigned bytes ( 0 to 255)
+     * Can be called in python bindings as pd.getOutputNumpy() which will return a numpy array.
+     * WARNING: The returned numpy array may cause a segfault if this VideoSource object is destroyed.
+     * See note at http://docs.scipy.org/doc/numpy/reference/swig.interface-file.html#argout-view-arrays
+     *
+     * Example:
+     * import cv2
+     * import pydestin as pd
+     * vs = pd.VideoSource(True,"")
+     * cv2.waitKey(100)
+     * vs.grab()
+     * img = vs.getOutputGrayMatNumpy().reshape(512,512)
+     * cv2.imshow("Pic", img)
+     * cv2.waitKey(10)
+     */
+    void getOutputGrayMatNumpy(int* size, uchar** output ){
+        *size = greyscaled_frame.rows * greyscaled_frame.cols;
+        *output = greyscaled_frame.data;
+    }
+
+    /** Same as getOutputGrayMatNumpy but with color.
+     * Python Example:
+     * img = vs.getOutputGrayMatNumpy().reshape(512,512,3) # x3 for RGB
+     * cv2.imshow("Pic", img)
+     */
+    void getOutputColorMatNumpy(int* size, uchar** output ){
+        *size = flipped_frame.rows * flipped_frame.cols * flipped_frame.channels();
+        *output = flipped_frame.data;
     }
 
     cv::Mat & getOutputColorMat(){

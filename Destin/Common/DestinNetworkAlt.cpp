@@ -642,6 +642,15 @@ void DestinNetworkAlt::doDestin(float * input_array ) {
     }
 }
 
+void DestinNetworkAlt::doDestin(float * input_array, int size ) {
+    int iis = getNetwork()->inputImageSize;
+    if(size != iis){
+        std::cerr << "doDestin: Ignoring DeSTIN input, input_array had an unexpected size. Expected " << iis << " recieved " << size << std::endl;
+        return;
+    }
+    doDestin(input_array);
+}
+
 void DestinNetworkAlt::setIsTraining(bool isTraining) {
     this->training = isTraining;
     for(int l = 0 ; l < destin->nLayers ; l++){

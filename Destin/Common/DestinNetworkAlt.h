@@ -141,10 +141,13 @@ public:
 
     /** Runs the DeSTIN algorithm on the float array input.
       * This is usually a square greyscale image made of float values between 0.0 and 1.0
-      * The size of this array should be equal width x width, where width was passed
-      * into the DestinNetworkAlt constructor.
+      * The size of this array should be equal input_image_width x input_image_width (x 3 if DST_IMG_MODE_RGB)
       */
     void doDestin(float * input_array);
+
+    /** doDestin - signature for numpy Python bindings
+     */
+    void doDestin(float * input_array, int size);
 
     float**** getCentroidImages();
 

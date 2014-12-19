@@ -1,3 +1,4 @@
+#!/usr/bin/python
 import cv2
 import numpy as np
 import pydestin as pd
@@ -5,18 +6,41 @@ import random
 import datetime
 
 
-max_x = 512
-max_y = 512
+max_x = 512.0
+max_y = 512.0
 hidden_units = 10
 cross_valid_size = 50
 nn_save_file = "nn_save.xml"
 input_video = "./finger.mov"
 
 train_destin = False
+train_nn = True
+
 load_destin = "train_nn.dst"
 save_destin = "train_nn.dst"
 
 #openvc python bindings don't expose CvTermCriteria, so we defined it in destin bindings
+
+
+class VideoSource:
+    def __init__(self, input_video):
+        self.cap = cv2.VideoCapture(input_video)
+        self.img = None
+        self.width = -1
+        self.height = -1
+    def setFrame(self, frame):
+        self.cap.set(cv2.cv.CV_CAP_PROP_POS_FRAMES, frame)
+    def read(self):
+        ret, img = self.cap.read()
+        if(img):
+            img = np.array(cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) / 255.0, np.float32)
+            if(self.width != -1):
+                img = cv2.resize(img, (self.width, self.height))
+            self.img = img
+        return self.img
+    def setSize(self, width, height):
+        self.width = width
+        self.height = height
 
 def makeParams():
     term_crit = pd.cvTermCriteria(pd.CV_TERMCRIT_ITER | pd.CV_TERMCRIT_EPS, 20000, 0.0000001)
@@ -61,9 +85,18 @@ def loadTruthLabels():
     print "Loaded %d examples." % (len(frames))
     return (frames,xs,ys)
 
+def makeFeature(frames, vs, index, dn, xs, ys, be):
+    vs.setFrame(frames[index])
+    vs.grab()
+    for j in range(dn.getLayerCount()): # run enough times to flush out the data from prev frames
+        dn.doDestin(vs.getOutput())
+
+    return (be.getBeliefsNumpy(be.getOutputSize()), [xs[index], ys[index]] )
+
 def createFeatures(dn, vs):
+    print "Creating features..."
     be = pd.BeliefExporter(dn, 0)
-    vs.rewind()
+    vs.setFrame(0)
     frames, xs, ys = loadTruthLabels()
 
     # for training
@@ -78,24 +111,19 @@ def createFeatures(dn, vs):
     ri = range(len(frames)) # = random inicies
     random.shuffle(ri)
 
-    # helper function
-    def runFrame(i):
-        vs.setNextFrame(frames[ri[i]])
-        vs.grab()
-        for j in range(dn.getLayerCount()): # run enough times to flush out the data from prev frames
-            dn.doDestin(vs.getOutput())
-
     # create train features
     for i in xrange(len(frames) - cross_valid_size):
-        runFrame(i)
-        nn_train_features.append(be.getBeliefsNumpy(be.getOutputSize()))
-        nn_train_lables.append([xs[ri[i]], ys[ri[i]]])
+        feature, label = makeFeature(frames, vs, ri[i], dn, xs, ys, be)
+        nn_train_features.append(feature)
+        nn_train_lables.append(label)
 
     # create cross validation features
     for i in xrange(len(frames) - cross_valid_size + 1, len(frames)):
-        runFrame(i)
-        cv_features.append(be.getBeliefsNumpy(be.getOutputSize()))
-        cv_labels.append([xs[ri[i]], ys[ri[i]]])
+        feature, label = makeFeature(frames, vs, ri[i], dn, xs, ys, be)
+        cv_features.append(feature)
+        cv_labels.append(label)
+
+    print "Finished creating features."
 
     return (np.matrix(nn_train_features),
              np.matrix(nn_train_lables),
@@ -103,7 +131,7 @@ def createFeatures(dn, vs):
              np.matrix(cv_labels))
 
 def trainDestin():
-    vs = pd.VideoSource(False, input_video)
+    vs = VideoSource()
     width = 256
     vs.setSize(width,width)
     layers = 7
@@ -137,19 +165,43 @@ def trainNN(features, labels):
     print "Starting NN Training..."
     nn.train(features, labels, None, None, makeParams())
     print "Finished NN Training"
-    #nn.train(data, truth, None, np.array([0,1,2,3]))
-    #nn.train(data, truth, None)
     nn.save(nn_save_file)
     return nn
 
 def meanSquaredError(actual, expected):
-    return np.power((actual - expected),2).mean()
+    return np.abs(actual - expected).mean()
+    #return np.power((actual - expected),2).mean()
 
 def checkAccuracy(neural_net, train_features, train_labels, cv_features, cv_labels):
     dummy, train_preds = neural_net.predict(train_features)
     dummy, cv_preds = neural_net.predict(cv_features)
     print "MSE Train:", meanSquaredError(train_preds, train_labels)
     print "MSE CV:", meanSquaredError(cv_preds, cv_labels)
+
+
+def visualizePrediction(vs, nn, dn):
+    dn.setIsTraining(False)
+
+    frames, xs, ys = loadTruthLabels()
+
+    be = pd.BeliefExporter(dn,0)
+    for i in range(len(frames)):
+        feature, coord = makeFeature(frames, vs, i, dn, xs, ys, be)
+        dummy, pred = nn.predict(feature.reshape(1,feature.size))
+        x = int(pred[0][0] * max_x)
+        y = int(pred[0][1] * max_y)
+        expected_x = int(xs[i] * max_x)
+        expected_y = int(ys[i] * max_y)
+
+        vs.grab()
+        image = vs.getOutputColorMatNumpy().reshape(max_y,max_x,3)
+        if(image != None):
+            cv2.circle(image, (expected_x, expected_y), radius=5, color=(255,0,0), thickness=-1)
+            cv2.circle(image, (x, y), radius=5, color=(0,255,0), thickness=-1)
+            cv2.imshow('frame',image)
+            wk = cv2.waitKey() # waits till key press
+            if wk & 0xFF == ord('q'): # break if q is pressed
+                break
 
 
 def run():
@@ -160,9 +212,15 @@ def run():
         dn.setIsTraining(False)
         vs = pd.VideoSource(False, input_video)
 
-    features, labels, cv_features, cv_labels = createFeatures(dn, vs)
-    nn = trainNN(features, labels)
+        features, labels, cv_features, cv_labels = createFeatures(dn, vs)
+
+    if train_nn:
+        nn = trainNN(features, labels)
+    else:
+        nn = cv2.ANN_MLP()
+        nn.load(nn_save_file)
 
     checkAccuracy(nn, features, labels, cv_features, cv_labels)
+    visualizePrediction(vs, nn, dn)
 
 run()

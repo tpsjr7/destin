@@ -75,10 +75,10 @@ void VideoSource::processFrame(){
     }
 
     if(showWindow){
-        if(!isShowColor){
-			cv::imshow(this->win_title, greyscaled_frame); //show video to output window
+        if(isShowColor){
+            cv::imshow(this->win_title, flipped_frame); //show video to output window
 		}else{
-			cv::imshow(this->win_title, flipped_frame);
+            cv::imshow(this->win_title, greyscaled_frame);
 		}
     }
     return;
