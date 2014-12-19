@@ -94,6 +94,22 @@ public:
     }
 
     /**
+     * Used in the python bindings such as:
+     *  be.getBeliefsNumpy(5) which returns a new numpy array with the first 5 elements.
+     * @brief getBeliefsNumpy
+     * @param size - how many elements of the beliefs array to copy to output
+     * @param output - beliefs are coppied to this array
+     */
+    void getBeliefsNumpy(int size, float * output){
+        float * beliefs = getBeliefs();
+        if(size > outputSize){
+            std::cerr << "getBeliefs(), asking for more output than available." << std::endl;
+            size = outputSize;
+        }
+        std::copy(beliefs, beliefs + size, output);
+    }
+
+    /**
      * This appends the current destin beliefs to the file specified in the constructor.
      *
      * The first call to this method will create the file. The file is closed by the
