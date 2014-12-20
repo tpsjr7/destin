@@ -1,6 +1,6 @@
 import numpy as np
 import cv2
-
+import sys, getopt
 
 # This script generates training data from a video.
 # Each frame, you click where the object is, it outputs the frame# and the coordinates where you clicked.
@@ -8,14 +8,13 @@ import cv2
 # You can manually call the record_cam function to record from your webcam into a new output video.
 
 
-cap = cv2.VideoCapture("./finger.mov")
-out_features = open("output.txt", 'w')
+cap = None
+out_features = None
+last_shown_frame = 0
 
-print "Frame Count: %d" % (cap.get(cv2.cv.CV_CAP_PROP_FRAME_COUNT))
-
-last_frame_num = -1
 def showFrame(n=1):
-    global last_frame_num
+    global last_shown_frame
+
     # Capture frame-by-frame
     for i in xrange(n - 1):
         ret, frame = cap.read()
@@ -24,8 +23,7 @@ def showFrame(n=1):
     frame_num = int(round(cap.get(cv2.cv.CV_CAP_PROP_POS_FRAMES)))
     print "Frame: %d" % (frame_num)
 
-    out_features.write("%d " % (frame_num))
-
+    last_shown_frame = frame_num
     ret, frame = cap.read()
 
     # Our operations on the frame come here
@@ -35,8 +33,8 @@ def showFrame(n=1):
 
 def callback(event,x,y,flags,param):
     if event == cv2.EVENT_LBUTTONDOWN:
-        print "X: %d, Y: %d" % (x,y)
-        out_features.write("%d %d\n" % (x,y) )
+        print "F: %d, X: %d, Y: %d" % (last_shown_frame, x,y)
+        out_features.write("%d %d %d\n" % (last_shown_frame, x, y))
         out_features.flush()
         showFrame()
 
@@ -90,11 +88,43 @@ def labler():
     showFrame()
     capture()
 
+def usage():
+    print "%s -v <video> -f <startframe> -o <outputfile>" % (sys.argv[0])
+    return
+
+def main():
+    global cap, out_features
+    opts, args = getopt.getopt(sys.argv[1:],"hv:f:o:",["video=","frame=","out="])
+
+    start_frame = 0
+    for opt, arg in opts:
+        if opt == "-h":
+           usage()
+           sys.exit()
+        elif opt in ("-v", "--video"):
+            cap = cv2.VideoCapture(arg)
+            print "Frame Count: %d" % (cap.get(cv2.cv.CV_CAP_PROP_FRAME_COUNT))
+        elif opt in ("-o", "--out"):
+            out_features = open(arg, 'a')
+        elif opt in ("-f", "--frame"):
+            start_frame = float(arg)
+
+    if None in [out_features, cap]:
+        print "Missing a required option."
+        sys.exit()
+
+    cap.set(cv2.cv.CV_CAP_PROP_POS_FRAMES, start_frame)
+    labler()
+
+if __name__ == "__main__":
+    main()
+
+
 #playShuffle()
 
-labler()
-#record_cam()
-#capture()
+
+#record_cam(3000)
+
 # When everything done, release the capture
 #cap.release()
 #cv2.destroyAllWindows()
