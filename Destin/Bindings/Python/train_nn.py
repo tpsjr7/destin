@@ -5,13 +5,33 @@ import pydestin as pd
 import random
 import datetime
 
+#1  2 4  8  16 32  64
+#4  8 16 32 64 128 256
+centroids = [5,5,5,5,5,5]
+layers = len(centroids)
 
-max_x = 512.0
-max_y = 512.0
+#when training samples were created, this was the video dimensions
+labels_max_x = 512.0
+labels_max_y = 512.0
+
+# Size of the visualization window
+visual_width_x = 512.0
+visual_height_y = 512.0
+
+# Size of the video fed to DeSTIN
+destin_width = 4 * 2**(layers - 1)
+
 hidden_units = 10
-cross_valid_size = 50
+
+# number of samples used for cross validation
+cross_valid_frac = 0.3
+
 nn_save_file = "nn_save.xml"
+
+position_train_data="./finger_data.txt"
 input_video = "./finger.mov"
+
+destin_train_iterations = 900
 
 train_destin = False
 train_nn = True
@@ -19,28 +39,7 @@ train_nn = True
 load_destin = "train_nn.dst"
 save_destin = "train_nn.dst"
 
-#openvc python bindings don't expose CvTermCriteria, so we defined it in destin bindings
-
-
-class VideoSource:
-    def __init__(self, input_video):
-        self.cap = cv2.VideoCapture(input_video)
-        self.img = None
-        self.width = -1
-        self.height = -1
-    def setFrame(self, frame):
-        self.cap.set(cv2.cv.CV_CAP_PROP_POS_FRAMES, frame)
-    def read(self):
-        ret, img = self.cap.read()
-        if(img):
-            img = np.array(cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) / 255.0, np.float32)
-            if(self.width != -1):
-                img = cv2.resize(img, (self.width, self.height))
-            self.img = img
-        return self.img
-    def setSize(self, width, height):
-        self.width = width
-        self.height = height
+report_interval = 20
 
 def makeParams():
     term_crit = pd.cvTermCriteria(pd.CV_TERMCRIT_ITER | pd.CV_TERMCRIT_EPS, 20000, 0.0000001)
@@ -58,46 +57,71 @@ def train():
     data = np.matrix("0 0; 0 1 ; 1 0 ; 1 1", np.float32)
     truth = np.matrix("0 ; 1 ; 1 ; 0", np.float32)
 
-
     nn.train(data, truth, None, None, makeParams())
     #nn.train(data, truth, None, np.array([0,1,2,3]))
     #nn.train(data, truth, None)
 
     dummy, outputs = nn.predict(data)
-    print dummy, outputs
+    print outputs
+
     print datetime.datetime.now()
     print data
     print truth
     print "Iterations: ", dummy
 
+def scale_pos(fpos, min_pos, range_pos):
+    """
+    fpos - maxtrix of positions
+    min_pos - array of minimums of each column of fpos
+    range - array of ranges of each column of fpos
+    """
+    return (fpos - min_pos) / range_pos - 0.5
+
+def unscale_pos(scaled_pos, min_pos, range_pos):
+    return (scaled_pos + 0.5) * range_pos + min_pos
+
 def loadTruthLabels():
-    f = open("./finger_data.txt")
-    frames = []
-    xs = []
-    ys = []
+    data = np.genfromtxt(position_train_data, dtype=np.int, invalid_raise=True)
 
-    for line in f:
-        parts = line.split()
-        frames.append(int(parts[0]))
-        xs.append(float(parts[1]) / max_x)
-        ys.append(float(parts[2]) / max_y)
+    # frames used from the video
+    frames = data[:,0].astype(np.int32)
+    print "Loaded %d examples." % (frames.size)
 
-    print "Loaded %d examples." % (len(frames))
-    return (frames,xs,ys)
+    # finger position for each frame
+    fpos = data[:,(1,2)].astype(np.float32)
+    min_pos = np.min(fpos, 0)
+    range_pos = np.ptp(fpos, 0)
 
-def makeFeature(frames, vs, index, dn, xs, ys, be):
-    vs.setFrame(frames[index])
+    # scale the positions from -0.5 to 0.5
+    scaled_pos = scale_pos(fpos, min_pos, range_pos)
+
+    pos_struct = lambda: None
+    pos_struct.frames = frames
+    pos_struct.fpos = fpos
+    pos_struct.min_pos = min_pos
+    pos_struct.range_pos = range_pos
+    pos_struct.scaled_pos = scaled_pos
+
+    return pos_struct
+
+def makeFeature(pos_struct, vs, index, dn, be, counter):
+    ps = pos_struct
+
+    if counter % report_interval == 0:
+        print "Generating feature %d of %d" % (counter, ps.frames.size)
+
+    vs.setFrame(int(ps.frames[index]))
     vs.grab()
     for j in range(dn.getLayerCount()): # run enough times to flush out the data from prev frames
         dn.doDestin(vs.getOutput())
 
-    return (be.getBeliefsNumpy(be.getOutputSize()), [xs[index], ys[index]] )
+    return (be.getBeliefsNumpy(be.getOutputSize()), ps.scaled_pos[index])
 
 def createFeatures(dn, vs):
     print "Creating features..."
     be = pd.BeliefExporter(dn, 0)
     vs.setFrame(0)
-    frames, xs, ys = loadTruthLabels()
+    pos_struct = loadTruthLabels()
 
     # for training
     nn_train_features = []
@@ -107,19 +131,22 @@ def createFeatures(dn, vs):
     cv_features = []
     cv_labels = []
 
+    m = pos_struct.frames.size
+
     # randomize the data
-    ri = range(len(frames)) # = random inicies
+    ri = range(m) # = random inicies
     random.shuffle(ri)
 
+    cv_size = int(m * cross_valid_frac)
     # create train features
-    for i in xrange(len(frames) - cross_valid_size):
-        feature, label = makeFeature(frames, vs, ri[i], dn, xs, ys, be)
+    for i in xrange(m - cv_size):
+        feature, label = makeFeature(pos_struct, vs, ri[i], dn, be, i)
         nn_train_features.append(feature)
         nn_train_lables.append(label)
 
     # create cross validation features
-    for i in xrange(len(frames) - cross_valid_size + 1, len(frames)):
-        feature, label = makeFeature(frames, vs, ri[i], dn, xs, ys, be)
+    for i in xrange(m - cv_size + 1, m):
+        feature, label = makeFeature(pos_struct, vs, ri[i], dn, be, i)
         cv_features.append(feature)
         cv_labels.append(label)
 
@@ -130,16 +157,7 @@ def createFeatures(dn, vs):
              np.matrix(cv_features),
              np.matrix(cv_labels))
 
-def trainDestin():
-    vs = VideoSource()
-    width = 256
-    vs.setSize(width,width)
-    layers = 7
-    centroids = [5,5,5,5,5,5,5]
-    dn = pd.DestinNetworkAlt(width, layers, centroids, True)
-
-    train_iterations = 600
-
+def trainDestin(dn, layers):
     dn.setIsTraining(False)
 
     for stage in xrange(layers):
@@ -147,7 +165,7 @@ def trainDestin():
             dn.setLayerIsTraining(stage - 1, False)
         dn.setLayerIsTraining(stage, True)
 
-        for i in xrange(train_iterations):
+        for i in xrange(destin_train_iterations):
             if vs.grab():
                 dn.doDestin(vs.getOutput())
                 if i % 10 == 0:
@@ -182,45 +200,51 @@ def checkAccuracy(neural_net, train_features, train_labels, cv_features, cv_labe
 def visualizePrediction(vs, nn, dn):
     dn.setIsTraining(False)
 
-    frames, xs, ys = loadTruthLabels()
-
+    pos_struct = loadTruthLabels()
     be = pd.BeliefExporter(dn,0)
-    for i in range(len(frames)):
-        feature, coord = makeFeature(frames, vs, i, dn, xs, ys, be)
+
+    ratio_x = float(visual_width_x) / labels_max_x
+    ratio_y = float(visual_height_y) / labels_max_y
+    for i in xrange(pos_struct.frames.size):
+        feature, coord = makeFeature(pos_struct, vs, i, dn, be, i)
         dummy, pred = nn.predict(feature.reshape(1,feature.size))
-        x = int(pred[0][0] * max_x)
-        y = int(pred[0][1] * max_y)
-        expected_x = int(xs[i] * max_x)
-        expected_y = int(ys[i] * max_y)
+
+        pred_pos = unscale_pos(pred[0], pos_struct.min_pos, pos_struct.range_pos)
+
+        x = int(pred_pos[0] * ratio_x)
+        y = int(pred_pos[1] * ratio_y)
+        expected_x = int(pos_struct.fpos[i][0] * ratio_x)
+        expected_y = int(pos_struct.fpos[i][1] * ratio_y)
 
         vs.grab()
-        image = vs.getOutputColorMatNumpy().reshape(max_y,max_x,3)
-        if(image != None):
-            cv2.circle(image, (expected_x, expected_y), radius=5, color=(255,0,0), thickness=-1)
-            cv2.circle(image, (x, y), radius=5, color=(0,255,0), thickness=-1)
-            cv2.imshow('frame',image)
-            wk = cv2.waitKey() # waits till key press
-            if wk & 0xFF == ord('q'): # break if q is pressed
-                break
+        image = vs.getOutputColorMatNumpy().reshape(destin_width,destin_width,3)
+        resized = cv2.resize(image, (int(visual_width_x), int(visual_height_y)))
+        cv2.circle(resized, (expected_x, expected_y), radius=5, color=(255,0,0), thickness=-1)
+        cv2.circle(resized, (x, y), radius=5, color=(0,255,0), thickness=-1)
+        cv2.imshow('frame',resized)
+        wk = cv2.waitKey() # waits till key press
+        if wk & 0xFF == ord('q'): # break if q is pressed
+            break
 
 
-def run():
-    if train_destin:
-        dn, vs = trainDestin()
-    else:
-        dn = pd.DestinNetworkAlt(load_destin)
-        dn.setIsTraining(False)
-        vs = pd.VideoSource(False, input_video)
+## Script body ##
+vs = pd.VideoSource(False, input_video)
+vs.setSize(destin_width, destin_width)
 
-        features, labels, cv_features, cv_labels = createFeatures(dn, vs)
+if train_destin:
+    dn = pd.DestinNetworkAlt(destin_width, layers, centroids, True)
+    dn, vs = trainDestin(dn, layers)
+else:
+    dn = pd.DestinNetworkAlt(load_destin)
+    dn.setIsTraining(False)
 
-    if train_nn:
-        nn = trainNN(features, labels)
-    else:
-        nn = cv2.ANN_MLP()
-        nn.load(nn_save_file)
+features, labels, cv_features, cv_labels = createFeatures(dn, vs)
 
-    checkAccuracy(nn, features, labels, cv_features, cv_labels)
-    visualizePrediction(vs, nn, dn)
+if train_nn:
+    nn = trainNN(features, labels)
+else:
+    nn = cv2.ANN_MLP()
+    nn.load(nn_save_file)
 
-run()
+checkAccuracy(nn, features, labels, cv_features, cv_labels)
+visualizePrediction(vs, nn, dn)
