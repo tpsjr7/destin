@@ -1124,6 +1124,91 @@ DestinConfig* CreateDefaultConfig(uint layers){
     return config;
 }
 
+void PrintConfig(Destin * d){
+    printf("addCoef %f\n", d->addCoeff);
+    printf("BeliefTransformEnum: %i\n", d->beliefTransform);
+    printf("centLearnStrat %i\n", d->centLearnStrat);
+    printf("distanceMetric %i\n", d->distanceMetric);
+    printf("extRatio %i\n", d->extRatio);
+    printf("fixedLearnRate %f\n", d->fixedLearnRate);
+    printf("freqCoeff %f\n", d->freqCoeff);
+    printf("freqTreshold %f\n", d->freqTreshold);
+    printf("hasMultiParents: ");
+    int i;
+    for(i = 0; i < d->nLayers ; i++){
+        printf("%i ", d->hasMultiParents[i]);
+    }
+    printf("\n");
+    printf("inputImageSize %i\n", d->inputImageSize);
+
+    printf("inputLabel: ");
+    for(i = 0 ; i < d->nc ; i++){
+        printf("%i ", d->inputLabel[i]);
+    }
+    printf("\n");
+    printf("isRecurrent: %i\n", d->isRecurrent);
+    printf("isUniform: %i\n", d->isUniform);
+    printf("layerMask: ");
+    for(i = 0 ; i < d->nLayers ; i++){
+        printf("%i ", d->layerMask[i]);
+    }
+    printf("\n");
+    printf("layerMaxNb: ");
+    for(i = 0 ; i < d->nLayers ; i++){
+        printf("%i ", d->layerMaxNb[i]);
+    }
+    printf("\n");
+    printf("layerNodeOffsets: ");
+    for(i = 0 ; i < d->nLayers ; i++){
+        printf("%i ", d->layerNodeOffsets[i]);
+    }
+    printf("\n");
+    printf("layerSize: ");
+    for(i = 0 ; i < d->nLayers ; i++){
+        printf("%i ", d->layerSize[i]);
+    }
+    printf("\n");
+    printf("layerWidth: ");
+    for(i = 0 ; i < d->nLayers ; i++){
+        printf("%i ", d->layerWidth[i]);
+    }
+    printf("\n");
+    printf("maxNb %i\n", d->maxNb);
+    printf("maxNs %i\n", d->maxNs);
+    printf("muSumSqDiff %f\n", d->maxNs);
+    printf("nb: ");
+    for(i = 0 ; i < d->nLayers ; i++){
+        printf("%i ", d->nb[i]);
+    }
+    printf("\n");
+    printf("nc %i\n", d->nc);
+    printf("nci: ");
+    for(i = 0 ; i < d->nLayers ; i++){
+        printf("%i ", d->nci[i]);
+    }
+    printf("\n");
+    printf("nLayers %i\n", d->nLayers);
+    printf("nMovements %i\n", d->nMovements);
+    printf("nNodes %i\n", d->nNodes);
+    printf("serializeVersion %i\n", d->serializeVersion);
+    printf("tep %i\n", d->serializeVersion);
+    printf("temp: ");
+    for(i = 0 ; i < d->nLayers ; i++){
+        printf("%f ", d->temp[i]);
+    }
+    printf("\n");
+    printf("uf_starv:\n");
+    for(i = 0 ; i < d->nLayers ; i++){
+        int j;
+        printf("\tL%i: ", i);
+        for(j = 0 ; j  < d->nb[i] ; j++){
+            printf("%f ", d->uf_starv[i][j]);
+        }
+        printf("\n");
+    }
+}
+
+
 void DestroyConfig(DestinConfig * c){
     FREE(c->centroids);
     FREE(c->temperatures);

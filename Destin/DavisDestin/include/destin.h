@@ -233,5 +233,9 @@ void Uniform_ResetStats(
 DestinConfig* CreateDefaultConfig(uint layers);
 void DestroyConfig(DestinConfig *);
 
+void PrintConfig(
+                    struct Destin  *
+                );
+
 /* Destin Functions End */
 #endif
