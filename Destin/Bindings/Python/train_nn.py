@@ -4,10 +4,35 @@ import numpy as np
 import pydestin as pd
 import random
 import datetime
+import sklearn.svm
+import scipy.sparse
+from sklearn.externals import joblib
+
+### Config ###
+
+train_destin = False    # If true, train destin otherwise load from destin_save_file
+create_features = False # if true, create features from destin otherwise load from features_save_file
+train_predictor = True  # if true then train the predictor, otherwise load from predictor_save_file
+show_visualization = True # Show visualization at the end
+
+predictor_type="SVM" # ANN or SVM
+
+destin_save_file = "train_predictor.dst"
+features_save_file = "finger_features.npy"
+predictor_save_file = "saves/predictor_%s_save.save" % (predictor_type)
+
+# If true, tries training the NN multiple times to find best # of units
+# when train_predictor is true
+search_hidden_units = False
+
+nn_hidden_units_search = [2,3,10,20,40,80,160]
+nn_hidden_units = 20 # use this if search_hidden_units is False
 
 #1  2 4  8  16 32  64
 #4  8 16 32 64 128 256
-centroids = [5,5,5,5,5,5]
+centroids = [4,8,16,16,16]
+#centroids = [5,5,5,5,5,5]
+
 layers = len(centroids)
 
 #when training samples were created, this was the video dimensions
@@ -19,55 +44,95 @@ visual_width_x = 512.0
 visual_height_y = 512.0
 
 # Size of the video fed to DeSTIN
-destin_width = 4 * 2**(layers - 1)
+destin_video_width = 4 * 2**(layers - 1)
 
-hidden_units = 10
-
-# number of samples used for cross validation
+# Fraction of feature vectors reserved for cross validation
 cross_valid_frac = 0.3
 
-nn_save_file = "nn_save.xml"
+# Training iterations per destin layer
+destin_train_iterations = 900
 
 position_train_data="./finger_data.txt"
 input_video = "./finger.mov"
 
-destin_train_iterations = 900
 
-train_destin = False
-train_nn = True
-
-load_destin = "train_nn.dst"
-save_destin = "train_nn.dst"
 
 report_interval = 20
 
-def makeParams():
-    term_crit = pd.cvTermCriteria(pd.CV_TERMCRIT_ITER | pd.CV_TERMCRIT_EPS, 20000, 0.0000001)
-    bp_dw_scale = 0.1
-    bp_moment_scale = 0.1
-    p = pd.CvANN_MLP_TrainParams(term_crit, int(cv2.ANN_MLP_TRAIN_PARAMS_BACKPROP), bp_dw_scale, bp_moment_scale)
-    print dir(p)
-    pd.dumpParams(p)
-    return p
+### Functions ###
 
-def train():
-    layers = np.array([2, 4, 1])
-    nn = cv2.ANN_MLP(layers, cv2.ANN_MLP_SIGMOID_SYM, 1.0, 1.0)
+class ANN:
+    def __init__(self, features, labels, config_dic):
 
-    data = np.matrix("0 0; 0 1 ; 1 0 ; 1 1", np.float32)
-    truth = np.matrix("0 ; 1 ; 1 ; 0", np.float32)
+        hidden_units = config_dic.get("hidden_units", nn_hidden_units)
+        self.nn = self.createNN(features, labels, hidden_units)
+        print self.nn
 
-    nn.train(data, truth, None, None, makeParams())
-    #nn.train(data, truth, None, np.array([0,1,2,3]))
-    #nn.train(data, truth, None)
+    def createNN(self, features, labels, hidden_units):
+        input_units = np.size(features,1) # length of destin belief feature vector
+        output_units = np.size(labels, 1) # should be just 2 for x,y
+        nn_layers = np.array([input_units, hidden_units, output_units])
+        nn = cv2.ANN_MLP(nn_layers, cv2.ANN_MLP_SIGMOID_SYM, 1.0, 1.0)
+        print "Created NN with hidden units:", hidden_units
+        return nn
 
-    dummy, outputs = nn.predict(data)
-    print outputs
+    def makeParams(self):
+        term_crit = pd.cvTermCriteria(pd.CV_TERMCRIT_ITER | pd.CV_TERMCRIT_EPS, 20000, 0.0000001)
+        bp_dw_scale = 0.1
+        bp_moment_scale = 0.1
+        p = pd.CvANN_MLP_TrainParams(term_crit, int(cv2.ANN_MLP_TRAIN_PARAMS_BACKPROP), bp_dw_scale, bp_moment_scale)
+        print dir(p)
+        pd.dumpParams(p)
+        return p
 
-    print datetime.datetime.now()
-    print data
-    print truth
-    print "Iterations: ", dummy
+    def train(self, features, labels):
+        self.nn.train(features, labels, None, None, self.makeParams())
+
+    def predict(self, features):
+        dummy, pred = self.nn.predict(features)
+        return pred
+
+    def save(self, filename):
+        self.nn.save(filename)
+
+    def load(self, filename):
+        self.nn = cv2.ANN_MLP()
+        self.nn.load(filename)
+
+class SVM:
+    def __init__(self):
+        params = {'C': 3, 'epsilon': 0.01, 'gamma': 0.03, 'kernel': 'rbf'}
+        self.svm_x = sklearn.svm.SVR(C=3,epsilon=0.01, gamma=0.03, kernel='rbf')
+        self.svm_y = sklearn.svm.SVR(C=3,epsilon=0.01, gamma=0.03, kernel='rbf')
+        #self.svm_x.set_params(params)
+        #self.svm_y.set_params(params)
+
+    def train(self, features, labels):
+        assert labels.shape[1] == 2 # make sure has just 2 columns, x and y positoins
+        x = np.asarray(labels[:,0]).reshape(-1,) # massage it into the expected format
+        y = np.asarray(labels[:,1]).reshape(-1,)
+        print self.svm_x.fit(features, x)
+        print self.svm_y.fit(features, y)
+
+    def predict(self, X):
+        x = self.svm_x.predict(X).reshape(-1,1) # make into column vector Mx1
+        y = self.svm_y.predict(X).reshape(-1,1)
+        return np.concatenate((x,y),1) #make into 2 column matrix, Mx2
+
+    def save(self, filename):
+        svms = (self.svm_x, self.svm_y)
+        joblib.dump(svms, predictor_save_file)
+
+    def load(self, filename):
+        self.svm_x, self.svm_y = joblib.load(predictor_save_file)
+
+def createPredictor(name, features, labels, config_dict = {}):
+    if name=="SVM":
+        return SVM()
+    elif name=="ANN":
+        return ANN(features, labels, config_dict)
+    else:
+        raise RuntimeError("Unknown predictor type " + str(name))
 
 def scale_pos(fpos, min_pos, range_pos):
     """
@@ -120,12 +185,13 @@ def makeFeature(pos_struct, vs, index, dn, be, counter):
 def createFeatures(dn, vs):
     print "Creating features..."
     be = pd.BeliefExporter(dn, 0)
+    print "Feature dimension is", be.getOutputSize()
     vs.setFrame(0)
     pos_struct = loadTruthLabels()
 
     # for training
-    nn_train_features = []
-    nn_train_lables = []
+    predictor_train_features = []
+    predictor_train_lables = []
 
     # cross validation
     cv_features = []
@@ -141,8 +207,8 @@ def createFeatures(dn, vs):
     # create train features
     for i in xrange(m - cv_size):
         feature, label = makeFeature(pos_struct, vs, ri[i], dn, be, i)
-        nn_train_features.append(feature)
-        nn_train_lables.append(label)
+        predictor_train_features.append(feature)
+        predictor_train_lables.append(label)
 
     # create cross validation features
     for i in xrange(m - cv_size + 1, m):
@@ -152,10 +218,14 @@ def createFeatures(dn, vs):
 
     print "Finished creating features."
 
-    return (np.matrix(nn_train_features),
-             np.matrix(nn_train_lables),
-             np.matrix(cv_features),
-             np.matrix(cv_labels))
+    ret = (np.array(predictor_train_features),
+             np.array(predictor_train_lables),
+             np.array(cv_features),
+             np.array(cv_labels))
+
+    np.save(features_save_file, ret)
+
+    return ret
 
 def trainDestin(dn, layers):
     dn.setIsTraining(False)
@@ -172,32 +242,35 @@ def trainDestin(dn, layers):
                     print "S: %d I: %d Q: %f" % (stage, i, dn.getQuality(stage))
 
     dn.setIsTraining(False)
-    dn.save(save_destin)
+    dn.save(destin_save_file)
 
     return (dn, vs)
 
-def trainNN(features, labels):
-    nn_layers = np.array([np.size(features,1), hidden_units, np.size(labels, 1)])
-    nn = cv2.ANN_MLP(nn_layers, cv2.ANN_MLP_SIGMOID_SYM, 1.0, 1.0)
+def trainPredictor(features, labels):
+    print "Starting predictor training..."
 
-    print "Starting NN Training..."
-    nn.train(features, labels, None, None, makeParams())
-    print "Finished NN Training"
-    nn.save(nn_save_file)
-    return nn
+    predictor = createPredictor(predictor_type, features, labels)
+
+    predictor.train(features, labels)
+    print "Finished predictor training"
+    predictor.save(predictor_save_file)
+    return predictor
 
 def meanSquaredError(actual, expected):
     return np.abs(actual - expected).mean()
     #return np.power((actual - expected),2).mean()
 
-def checkAccuracy(neural_net, train_features, train_labels, cv_features, cv_labels):
-    dummy, train_preds = neural_net.predict(train_features)
-    dummy, cv_preds = neural_net.predict(cv_features)
-    print "MSE Train:", meanSquaredError(train_preds, train_labels)
-    print "MSE CV:", meanSquaredError(cv_preds, cv_labels)
+def checkAccuracy(predictor, train_features, train_labels, cv_features, cv_labels):
+    train_preds = predictor.predict(train_features)
+    cv_preds = predictor.predict(cv_features)
+    train_err = meanSquaredError(train_preds, train_labels)
+    cv_err =  meanSquaredError(cv_preds, cv_labels)
+    print "MSE Train:", train_err
+    print "MSE CV:", cv_err
+    return (train_err, cv_err)
 
-
-def visualizePrediction(vs, nn, dn):
+def visualizePrediction(vs, predictor, dn):
+    print "Now displaying visualization window."
     dn.setIsTraining(False)
 
     pos_struct = loadTruthLabels()
@@ -207,7 +280,7 @@ def visualizePrediction(vs, nn, dn):
     ratio_y = float(visual_height_y) / labels_max_y
     for i in xrange(pos_struct.frames.size):
         feature, coord = makeFeature(pos_struct, vs, i, dn, be, i)
-        dummy, pred = nn.predict(feature.reshape(1,feature.size))
+        pred = predictor.predict(feature.reshape(1,feature.size))
 
         pred_pos = unscale_pos(pred[0], pos_struct.min_pos, pos_struct.range_pos)
 
@@ -217,34 +290,69 @@ def visualizePrediction(vs, nn, dn):
         expected_y = int(pos_struct.fpos[i][1] * ratio_y)
 
         vs.grab()
-        image = vs.getOutputColorMatNumpy().reshape(destin_width,destin_width,3)
+        image = vs.getOutputColorMatNumpy().reshape(destin_video_width,destin_video_width,3)
         resized = cv2.resize(image, (int(visual_width_x), int(visual_height_y)))
         cv2.circle(resized, (expected_x, expected_y), radius=5, color=(255,0,0), thickness=-1)
         cv2.circle(resized, (x, y), radius=5, color=(0,255,0), thickness=-1)
         cv2.imshow('frame',resized)
         wk = cv2.waitKey() # waits till key press
         if wk & 0xFF == ord('q'): # break if q is pressed
+            cv2.destroyAllWindows()
             break
 
+def search(possible_hidden_units, X, y, X_cv, y_cv):
+    """
+        Searches for the best hidden units value by testing multiple neural networks
+    """
+    stats = []
+    min_cv_err = float("inf")
+    best_nn = None
+    best_index = 0
+    for index, hu in enumerate(possible_hidden_units):
+        temp_nn = createPredictor(predictor_type, X, y, {'hidden_units': hu})
+        train_err, cv_err = checkAccuracy(temp_nn, X, y, X_cv, y_cv)
+        stats.append([train_err, cv_err])
+        if cv_err < min_cv_err:
+            best_nn = temp_nn
+            min_cv_err = cv_err
+            best_index = index
+
+    return (best_nn, best_index, stats)
 
 ## Script body ##
 vs = pd.VideoSource(False, input_video)
-vs.setSize(destin_width, destin_width)
+vs.setSize(destin_video_width, destin_video_width)
 
 if train_destin:
-    dn = pd.DestinNetworkAlt(destin_width, layers, centroids, True)
+    dn = pd.DestinNetworkAlt(destin_video_width, layers, centroids, True)
     dn, vs = trainDestin(dn, layers)
 else:
-    dn = pd.DestinNetworkAlt(load_destin)
+    dn = pd.DestinNetworkAlt(destin_save_file)
     dn.setIsTraining(False)
 
-features, labels, cv_features, cv_labels = createFeatures(dn, vs)
-
-if train_nn:
-    nn = trainNN(features, labels)
+if create_features:
+    features, labels, cv_features, cv_labels = createFeatures(dn, vs)
 else:
-    nn = cv2.ANN_MLP()
-    nn.load(nn_save_file)
+    features, labels, cv_features, cv_labels = np.load(features_save_file)
 
-checkAccuracy(nn, features, labels, cv_features, cv_labels)
-visualizePrediction(vs, nn, dn)
+if train_predictor:
+    if search_hidden_units and predictor_type=="ANN" :
+        best_nn, best_index, stats = search(nn_hidden_units_search, features,
+            labels, cv_features, cv_labels)
+
+        for i,s in enumerate(stats):
+            print "HU:",nn_hidden_units_search[i], "Train err:", s[0], "CV err:", s[1]
+
+        print "Best CV err:", stats[best_index][1], "Hidden units:", nn_hidden_units_search[i]
+        predictor = best_nn
+    else:
+        predictor = trainPredictor(features, labels)
+
+else:
+    predictor = createPredictor(predictor_type, features, labels)
+    predictor.load(predictor_save_file)
+
+checkAccuracy(predictor, features, labels, cv_features, cv_labels)
+
+if show_visualization:
+    visualizePrediction(vs, predictor, dn)
