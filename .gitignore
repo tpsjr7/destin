@@ -1,3 +1,4 @@
 Destin-build/
 *.dylib
 *.jnilib
+*.dst
