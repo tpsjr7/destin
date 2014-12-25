@@ -1128,7 +1128,6 @@ void PrintConfig(Destin * d){
     printf("addCoef %f\n", d->addCoeff);
     printf("BeliefTransformEnum: %i\n", d->beliefTransform);
     printf("centLearnStrat %i\n", d->centLearnStrat);
-    printf("distanceMetric %i\n", d->distanceMetric);
     printf("extRatio %i\n", d->extRatio);
     printf("fixedLearnRate %f\n", d->fixedLearnRate);
     printf("freqCoeff %f\n", d->freqCoeff);
