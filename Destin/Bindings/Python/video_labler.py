@@ -11,7 +11,9 @@ import sys, getopt
 cap = None
 out_features = None
 last_shown_frame = 0
+mode = "l" #l=label, c=capture
 
+is_paused = False
 def showFrame(n=1):
     global last_shown_frame
 
@@ -46,28 +48,56 @@ def capture():
         elif wk & 0xFF == ord('q'):
             break
 
-def record_cam(frames = 300):
-	vc = cv2.VideoCapture(0)
+def record_cam():
+    vc = cv2.VideoCapture(0)
 
-	#width = int(vc.get(cv2.cv.CV_CAP_PROP_FRAME_WIDTH))
-	#height = int(vc.get(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT))
+    #width = int(vc.get(cv2.cv.CV_CAP_PROP_FRAME_WIDTH))
+    #height = int(vc.get(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT))
+    record_frames = 0
+    width = 512
+    height = 512
 
-	width = 512
-	height = 512
+    fcc = cv2.cv.CV_FOURCC('m','p','4','v')
+    fps = 15
+    vw = cv2.VideoWriter("theoutput.mov", fcc, fps, (width,height))
 
-	fcc = cv2.cv.CV_FOURCC('m','p','4','v')
-	fps = 15
-	vw = cv2.VideoWriter("theoutput.mov", fcc, fps, (width,height))
+    count = 0
+    is_paused = True # start in paused mode
+    while True:
+        ret, frame = vc.read()
+        if frame == None:
+            continue
 
-	for x in xrange(frames):
-		ret, frame = vc.read()
-		if(frame != None):
-			resized = cv2.resize(frame, (width,height))
-			#gray = cv2.cvtColor(resized, cv2.COLOR_BGR2GRAY)
-			vw.write(resized)
-			cv2.imshow('frame',resized)
-    		cv2.waitKey(1)
-	vw.release()
+        resized = cv2.resize(frame, (width,height))
+        cv2.imshow('frame',resized)
+
+        if record_frames > 0:
+            record_frames = record_frames - 1
+            if record_frames == 0:
+                is_paused = True
+                print "Paused"
+
+        if not is_paused:
+            vw.write(resized)
+            count = count + 1
+            if count % 10 == 0:
+                print "Count: %d" % (count)
+
+        wk = cv2.waitKey(1)
+        if wk & 0xFF == ord('q'): # break if q is pressed
+            cv2.destroyAllWindows()
+            break
+        elif wk & 0xFF == ord('p'): #pause
+            is_paused = not is_paused
+            if is_paused:
+                print "Paused"
+            else:
+                print "Un-paused"
+        elif wk & 0xFF == ord('s'):  # record a set amount of frames then pause
+            record_frames = 30
+            is_paused = False
+
+    vw.release()
 
 # tests how fast it can play a video shuffled
 def playShuffle():
@@ -93,8 +123,8 @@ def usage():
     return
 
 def main():
-    global cap, out_features
-    opts, args = getopt.getopt(sys.argv[1:],"hv:f:o:",["video=","frame=","out="])
+    global cap, out_features, mode
+    opts, args = getopt.getopt(sys.argv[1:],"hv:f:o:m:",["video=","frame=","out=","mode="])
 
     start_frame = 0
     for opt, arg in opts:
@@ -108,13 +138,22 @@ def main():
             out_features = open(arg, 'a')
         elif opt in ("-f", "--frame"):
             start_frame = float(arg)
+        elif opt in ("-m", "--mode"):
+            mode = arg
 
-    if None in [out_features, cap]:
+    if mode=="l" and None in [out_features, cap]:
         print "Missing a required option."
         sys.exit()
 
-    cap.set(cv2.cv.CV_CAP_PROP_POS_FRAMES, start_frame)
-    labler()
+    if mode=="l":
+        cap.set(cv2.cv.CV_CAP_PROP_POS_FRAMES, start_frame)
+        labler()
+    elif mode=="c":
+        record_cam()
+    else:
+        print "Unknown mode %s" % (mode)
+
+
 
 if __name__ == "__main__":
     main()

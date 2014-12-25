@@ -158,6 +158,14 @@ public:
         cap->set(CV_CAP_PROP_POS_FRAMES, frame_num);
     }
 
+    int getFrame(){
+        return (int)cap->get(CV_CAP_PROP_POS_FRAMES);
+    }
+
+    int getTotalFrames(){
+        return (int)cap->get(CV_CAP_PROP_FRAME_COUNT);
+    }
+
 	~VideoSource() {
 		delete cap;
 		delete [] float_frame;
