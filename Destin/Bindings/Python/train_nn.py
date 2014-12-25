@@ -7,13 +7,17 @@ import datetime
 import sklearn.svm
 import scipy.sparse
 from sklearn.externals import joblib
+from sklearn.grid_search import GridSearchCV
 
 ### Config ###
 
 train_destin = False    # If true, train destin otherwise load from destin_save_file
 create_features = False # if true, create features from destin otherwise load from features_save_file
-train_predictor = True  # if true then train the predictor, otherwise load from predictor_save_file
-show_visualization = True # Show visualization at the end
+train_predictor = False  # if true then train the predictor, otherwise load from predictor_save_file
+calc_final_error = False # Run predictor on all train and test features and report the error
+show_visualization = False # Show posistion prediction visualization on training video
+show_visualization_live = False # Show posistion prediction with live webcam
+create_learning_curve = False #
 
 predictor_type="SVM" # ANN or SVM
 
@@ -30,7 +34,7 @@ nn_hidden_units = 20 # use this if search_hidden_units is False
 
 #1  2 4  8  16 32  64
 #4  8 16 32 64 128 256
-centroids = [4,8,16,16,16]
+centroids = [5,8,16,16,16]
 #centroids = [5,5,5,5,5,5]
 
 layers = len(centroids)
@@ -51,13 +55,19 @@ cross_valid_frac = 0.3
 
 # Training iterations per destin layer
 destin_train_iterations = 900
+jump_speed = 7
 
-position_train_data="./finger_data.txt"
-input_video = "./finger.mov"
-
-
+position_train_data="./really_big_lables.txt"
+#position_train_data="./large_fingers.txt"
+#position_train_data="./finger_data.txt"
+#input_video = "./finger.mov"
+#input_video = "./large_finger.mov"
+input_video = "./really_big_finger.mov"
 
 report_interval = 20
+
+### Global Vars ###
+grid_search_clf = None
 
 ### Functions ###
 
@@ -101,9 +111,10 @@ class ANN:
 
 class SVM:
     def __init__(self):
-        params = {'C': 3, 'epsilon': 0.01, 'gamma': 0.03, 'kernel': 'rbf'}
-        self.svm_x = sklearn.svm.SVR(C=3,epsilon=0.01, gamma=0.03, kernel='rbf')
-        self.svm_y = sklearn.svm.SVR(C=3,epsilon=0.01, gamma=0.03, kernel='rbf')
+        #params = {'C': 3, 'epsilon': 0.01, 'gamma': 0.03, 'kernel': 'rbf'}
+        self.svm_x = sklearn.svm.SVR(C=30,epsilon=0.01, gamma=0.03, kernel='rbf')
+        self.svm_y = sklearn.svm.SVR(C=30,epsilon=0.01, gamma=0.03, kernel='rbf')
+        #{'C': 30, 'epsilon': 0.01, 'gamma': 0.03, 'kernel': 'rbf'}
         #self.svm_x.set_params(params)
         #self.svm_y.set_params(params)
 
@@ -134,6 +145,17 @@ def createPredictor(name, features, labels, config_dict = {}):
     else:
         raise RuntimeError("Unknown predictor type " + str(name))
 
+def normalize(array):
+    mean = array.mean(0)
+    norm = array - mean
+    std = norm.std(0)
+    norm = norm / std
+    return (norm, mean, std)
+
+def un_normalize(array, mean, std):
+    out = array * std + mean
+    return out
+
 def scale_pos(fpos, min_pos, range_pos):
     """
     fpos - maxtrix of positions
@@ -146,6 +168,7 @@ def unscale_pos(scaled_pos, min_pos, range_pos):
     return (scaled_pos + 0.5) * range_pos + min_pos
 
 def loadTruthLabels():
+    print "Loading truth labels"
     data = np.genfromtxt(position_train_data, dtype=np.int, invalid_raise=True)
 
     # frames used from the video
@@ -182,12 +205,11 @@ def makeFeature(pos_struct, vs, index, dn, be, counter):
 
     return (be.getBeliefsNumpy(be.getOutputSize()), ps.scaled_pos[index])
 
-def createFeatures(dn, vs):
+def createFeatures(dn, vs, pos_struct):
     print "Creating features..."
     be = pd.BeliefExporter(dn, 0)
     print "Feature dimension is", be.getOutputSize()
     vs.setFrame(0)
-    pos_struct = loadTruthLabels()
 
     # for training
     predictor_train_features = []
@@ -236,6 +258,7 @@ def trainDestin(dn, layers):
         dn.setLayerIsTraining(stage, True)
 
         for i in xrange(destin_train_iterations):
+            vs.setFrame(vs.getFrame() + jump_speed)
             if vs.grab():
                 dn.doDestin(vs.getOutput())
                 if i % 10 == 0:
@@ -256,24 +279,35 @@ def trainPredictor(features, labels):
     predictor.save(predictor_save_file)
     return predictor
 
-def meanSquaredError(actual, expected):
+def meanAbsError(actual, expected):
     return np.abs(actual - expected).mean()
-    #return np.power((actual - expected),2).mean()
+
+def meanSquaredError(actual, expected):
+    return np.power((actual - expected),2).mean()
 
 def checkAccuracy(predictor, train_features, train_labels, cv_features, cv_labels):
+    print "Checking accuracy..."
+    print "Checking train accuracy..."
     train_preds = predictor.predict(train_features)
+    print "Checking CV accuracy..."
     cv_preds = predictor.predict(cv_features)
-    train_err = meanSquaredError(train_preds, train_labels)
-    cv_err =  meanSquaredError(cv_preds, cv_labels)
-    print "MSE Train:", train_err
-    print "MSE CV:", cv_err
-    return (train_err, cv_err)
+    train_mse = meanSquaredError(train_preds, train_labels)
+    cv_mse =  meanSquaredError(cv_preds, cv_labels)
+    print "MSE Train:", train_mse
+    print "MSE CV:", cv_mse
 
-def visualizePrediction(vs, predictor, dn):
+    train_mae = meanAbsError(train_preds, train_labels)
+    cv_mae = meanAbsError(cv_preds, cv_labels)
+
+    print "MAE Train:", train_mae
+    print "MAE CV:", cv_mae
+
+    return (train_mse, cv_mse)
+
+def visualizePrediction(vs, predictor, dn, pos_struct):
     print "Now displaying visualization window."
     dn.setIsTraining(False)
 
-    pos_struct = loadTruthLabels()
     be = pd.BeliefExporter(dn,0)
 
     ratio_x = float(visual_width_x) / labels_max_x
@@ -300,6 +334,36 @@ def visualizePrediction(vs, predictor, dn):
             cv2.destroyAllWindows()
             break
 
+def visualizeLive(predictor, dn, pos_struct):
+    print "Running live visualization..."
+    wc = pd.VideoSource(True, "")
+    dn.setIsTraining(False)
+    wc.setSize(destin_video_width, destin_video_width)
+    be = pd.BeliefExporter(dn,0)
+    ratio_x = float(visual_width_x) / labels_max_x
+    ratio_y = float(visual_height_y) / labels_max_y
+
+    while True:
+        if wc.grab():
+            dn.doDestin(wc.getOutput())
+
+            feature = be.getBeliefsNumpy(be.getOutputSize())
+            pred = predictor.predict(feature.reshape(1,feature.size))
+
+            pred_pos = unscale_pos(pred[0], pos_struct.min_pos, pos_struct.range_pos)
+
+            x = int(pred_pos[0] * ratio_x)
+            y = int(pred_pos[1] * ratio_y)
+
+            image = wc.getOutputColorMatNumpy().reshape(destin_video_width,destin_video_width,3)
+            resized = cv2.resize(image, (int(visual_width_x), int(visual_height_y)))
+            cv2.circle(resized, (x, y), radius=5, color=(255,0,0), thickness=-1)
+            cv2.imshow('frame',resized)
+            wk = cv2.waitKey(5)
+            if wk & 0xFF == ord('q'): # break if q is pressed
+                cv2.destroyAllWindows()
+                break
+
 def search(possible_hidden_units, X, y, X_cv, y_cv):
     """
         Searches for the best hidden units value by testing multiple neural networks
@@ -319,21 +383,66 @@ def search(possible_hidden_units, X, y, X_cv, y_cv):
 
     return (best_nn, best_index, stats)
 
+def createLearningCurve(features, labels, cv_features, cv_labels):
+
+    print "Creating learning curve..."
+    steps = 10
+    start = 10
+    end = features.shape[0]
+    step_size =(end - start) / steps
+
+    errors = []
+    count = 0
+    for size in xrange(start, end, step_size):
+        count = count + 1
+        print "Step %d of %d. Using %d of %d training samples." %(count, steps, size, end)
+        feats = features[0:size,:]
+        labs = labels[0:size,:]
+        predictor = trainPredictor(feats, labs)
+        train_err, cv_err = checkAccuracy(predictor, feats, labs, cv_features, cv_labels)
+        errors.append((train_err, cv_err))
+
+    return errors
+
+def gridSearch(features, labels):
+    global grid_search_clf
+    tuned_parameters = [
+        {'kernel': ['rbf'],
+        'gamma': [.03, .01, .003],
+        'epsilon':[.01,.03,.1],
+        'C': [15, 30, 60]}]
+
+    score = 'mean_squared_error'
+    clf = GridSearchCV(sklearn.svm.SVR(C=1), tuned_parameters, cv=2, scoring=score, n_jobs=4)
+
+    scores = ['mean_squared_error']
+    x_labels = np.asarray(labels[:,0]).reshape(-1,)
+    #y_labels = np.asarray(labels[:,1]).reshape(-1,)
+    clf.fit(features, x_labels)
+    grid_search_clf = clf
+    return clf
+
+
 ## Script body ##
+print  "Creating video source."
 vs = pd.VideoSource(False, input_video)
 vs.setSize(destin_video_width, destin_video_width)
+pos_struct = loadTruthLabels()
 
 if train_destin:
     dn = pd.DestinNetworkAlt(destin_video_width, layers, centroids, True)
     dn, vs = trainDestin(dn, layers)
 else:
+    print "Loading destin network"
     dn = pd.DestinNetworkAlt(destin_save_file)
     dn.setIsTraining(False)
 
 if create_features:
-    features, labels, cv_features, cv_labels = createFeatures(dn, vs)
+    features, labels, cv_features, cv_labels = createFeatures(dn, vs, pos_struct)
 else:
+    print "Loading features..."
     features, labels, cv_features, cv_labels = np.load(features_save_file)
+    print "Finished loading features..."
 
 if train_predictor:
     if search_hidden_units and predictor_type=="ANN" :
@@ -350,9 +459,17 @@ if train_predictor:
 
 else:
     predictor = createPredictor(predictor_type, features, labels)
+    print "Loading predictor from", predictor_save_file
     predictor.load(predictor_save_file)
 
-checkAccuracy(predictor, features, labels, cv_features, cv_labels)
+if calc_final_error:
+    checkAccuracy(predictor, features, labels, cv_features, cv_labels)
 
 if show_visualization:
-    visualizePrediction(vs, predictor, dn)
+    visualizePrediction(vs, predictor, dn, pos_struct)
+
+if show_visualization_live:
+    visualizeLive(predictor, dn, pos_struct)
+
+if create_learning_curve:
+    learning_curve = createLearningCurve(features, labels, cv_features, cv_labels)
