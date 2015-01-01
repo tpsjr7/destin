@@ -11,13 +11,17 @@ from sklearn.grid_search import GridSearchCV
 
 ### Config ###
 
-train_destin = False    # If true, train destin otherwise load from destin_save_file
-create_features = False # if true, create features from destin otherwise load from features_save_file
-train_predictor = False  # if true then train the predictor, otherwise load from predictor_save_file
-calc_final_error = False # Run predictor on all train and test features and report the error
-show_visualization = False # Show posistion prediction visualization on training video
-show_visualization_live = False # Show posistion prediction with live webcam
-create_learning_curve = False #
+train_destin =              False # If true, train destin otherwise load from destin_save_file
+randomize_cross_data =      False # if true then cross validation samples are taken among train samples,
+                                  # otherwise they are taken from the end of the video
+create_features =           False # if true, create features from destin otherwise load from features_save_file
+train_predictor =           False # if true then train the predictor, otherwise load from predictor_save_file
+calc_final_error =          False # Run predictor on all train and test features and report the error
+show_visualization =        False # Show posistion prediction visualization on training video
+show_visualization_live =   False # Show posistion prediction with live webcam
+create_learning_curve =     False # Show learning curve of err vs number of training samples
+run_grid_search =           False # perform scikit grid search
+run_search_destin_params =  True  # search for destin params that gives best cv score
 
 predictor_type="SVM" # ANN or SVM
 
@@ -30,7 +34,7 @@ predictor_save_file = "saves/predictor_%s_save.save" % (predictor_type)
 search_hidden_units = False
 
 nn_hidden_units_search = [2,3,10,20,40,80,160]
-nn_hidden_units = 20 # use this if search_hidden_units is False
+nn_hidden_units = 40 # use this if search_hidden_units is False
 
 #1  2 4  8  16 32  64
 #4  8 16 32 64 128 256
@@ -63,8 +67,6 @@ position_train_data="./really_big_lables.txt"
 #input_video = "./finger.mov"
 #input_video = "./large_finger.mov"
 input_video = "./really_big_finger.mov"
-
-report_interval = 20
 
 ### Global Vars ###
 grid_search_clf = None
@@ -112,8 +114,9 @@ class ANN:
 class SVM:
     def __init__(self):
         #params = {'C': 3, 'epsilon': 0.01, 'gamma': 0.03, 'kernel': 'rbf'}
-        self.svm_x = sklearn.svm.SVR(C=30,epsilon=0.01, gamma=0.03, kernel='rbf')
-        self.svm_y = sklearn.svm.SVR(C=30,epsilon=0.01, gamma=0.03, kernel='rbf')
+        #{'C': 5, 'epsilon': 0.0001, 'gamma': 0.0003, 'kernel': 'rbf'}
+        self.svm_x = sklearn.svm.SVR(C=1,epsilon=0.01, gamma=0.0003, kernel='rbf')
+        self.svm_y = sklearn.svm.SVR(C=1,epsilon=0.01, gamma=0.0003, kernel='rbf')
         #{'C': 30, 'epsilon': 0.01, 'gamma': 0.03, 'kernel': 'rbf'}
         #self.svm_x.set_params(params)
         #self.svm_y.set_params(params)
@@ -144,17 +147,6 @@ def createPredictor(name, features, labels, config_dict = {}):
         return ANN(features, labels, config_dict)
     else:
         raise RuntimeError("Unknown predictor type " + str(name))
-
-def normalize(array):
-    mean = array.mean(0)
-    norm = array - mean
-    std = norm.std(0)
-    norm = norm / std
-    return (norm, mean, std)
-
-def un_normalize(array, mean, std):
-    out = array * std + mean
-    return out
 
 def scale_pos(fpos, min_pos, range_pos):
     """
@@ -203,7 +195,25 @@ def makeFeature(pos_struct, vs, index, dn, be, counter):
     for j in range(dn.getLayerCount()): # run enough times to flush out the data from prev frames
         dn.doDestin(vs.getOutput())
 
-    return (be.getBeliefsNumpy(be.getOutputSize()), ps.scaled_pos[index])
+    beliefs = be.getBeliefsNumpy(be.getOutputSize())
+    return (beliefs, ps.scaled_pos[index])
+
+def normalize(array):
+    mean = array.mean(0)
+    norm = array - mean
+    std = norm.std(0)
+    norm = norm / std
+    return (norm, mean, std)
+
+def normSingleFeature(feature, norm_stats):
+    mean = norm_stats[0]
+    std = norm_stats[1]
+    out = (feature - mean) / std
+    return out
+
+def unNormalize(array, mean, std):
+    out = array * std + mean
+    return out
 
 def createFeatures(dn, vs, pos_struct):
     print "Creating features..."
@@ -223,7 +233,8 @@ def createFeatures(dn, vs, pos_struct):
 
     # randomize the data
     ri = range(m) # = random inicies
-    random.shuffle(ri)
+    if randomize_cross_data:
+        random.shuffle(ri)
 
     cv_size = int(m * cross_valid_frac)
     # create train features
@@ -232,18 +243,25 @@ def createFeatures(dn, vs, pos_struct):
         predictor_train_features.append(feature)
         predictor_train_lables.append(label)
 
+    predictor_train_features, mean, std  = normalize(np.asarray(predictor_train_features))
+    norm_stats = (mean, std)
+
     # create cross validation features
     for i in xrange(m - cv_size + 1, m):
         feature, label = makeFeature(pos_struct, vs, ri[i], dn, be, i)
         cv_features.append(feature)
         cv_labels.append(label)
 
+    cv_features = (np.asarray(cv_features) - mean) / std # normalize same as train features
+
     print "Finished creating features."
 
-    ret = (np.array(predictor_train_features),
-             np.array(predictor_train_lables),
-             np.array(cv_features),
-             np.array(cv_labels))
+    ret = (predictor_train_features,
+             np.asarray(predictor_train_lables),
+             cv_features,
+             np.asarray(cv_labels),
+             norm_stats
+             )
 
     np.save(features_save_file, ret)
 
@@ -266,8 +284,7 @@ def trainDestin(dn, layers):
 
     dn.setIsTraining(False)
     dn.save(destin_save_file)
-
-    return (dn, vs)
+    return
 
 def trainPredictor(features, labels):
     print "Starting predictor training..."
@@ -304,7 +321,7 @@ def checkAccuracy(predictor, train_features, train_labels, cv_features, cv_label
 
     return (train_mse, cv_mse)
 
-def visualizePrediction(vs, predictor, dn, pos_struct):
+def visualizePrediction(vs, predictor, dn, pos_struct, norm_stats):
     print "Now displaying visualization window."
     dn.setIsTraining(False)
 
@@ -312,8 +329,11 @@ def visualizePrediction(vs, predictor, dn, pos_struct):
 
     ratio_x = float(visual_width_x) / labels_max_x
     ratio_y = float(visual_height_y) / labels_max_y
-    for i in xrange(pos_struct.frames.size):
+
+    i = 0
+    while i < pos_struct.frames.size:
         feature, coord = makeFeature(pos_struct, vs, i, dn, be, i)
+        feature = normSingleFeature(feature, norm_stats)
         pred = predictor.predict(feature.reshape(1,feature.size))
 
         pred_pos = unscale_pos(pred[0], pos_struct.min_pos, pos_struct.range_pos)
@@ -333,8 +353,13 @@ def visualizePrediction(vs, predictor, dn, pos_struct):
         if wk & 0xFF == ord('q'): # break if q is pressed
             cv2.destroyAllWindows()
             break
+        elif wk & 0xFF == ord('c'): # jump to cross validation section of the video
+            f = int(pos_struct.frames.size * (1 - cross_valid_frac))
+            print "Jumping to frame", f
+            i = f
+        i = i + 1
 
-def visualizeLive(predictor, dn, pos_struct):
+def visualizeLive(predictor, dn, pos_struct, norm_stats):
     print "Running live visualization..."
     wc = pd.VideoSource(True, "")
     dn.setIsTraining(False)
@@ -345,9 +370,11 @@ def visualizeLive(predictor, dn, pos_struct):
 
     while True:
         if wc.grab():
-            dn.doDestin(wc.getOutput())
+            for i in xrange(dn.getLayerCount()):
+                dn.doDestin(wc.getOutput())
 
             feature = be.getBeliefsNumpy(be.getOutputSize())
+            feature = normSingleFeature(feature, norm_stats)
             pred = predictor.predict(feature.reshape(1,feature.size))
 
             pred_pos = unscale_pos(pred[0], pos_struct.min_pos, pos_struct.range_pos)
@@ -383,6 +410,68 @@ def search(possible_hidden_units, X, y, X_cv, y_cv):
 
     return (best_nn, best_index, stats)
 
+def searchDestinParams(vs, pos_struct):
+    print "Running search for best destin params"
+
+    cents = [
+        [32, 16, 16, 16],
+        [64, 64, 64, 64],
+        [16, 32, 64, 32],
+        [8, 8, 32, 16, 16],
+        [5, 8, 16, 16, 16],
+        [8, 8, 16, 16, 16],
+        [4, 4, 8, 8],
+        [4, 4, 16, 16],
+        [8, 8, 16, 16, 8],
+        [8, 8, 16, 16, 32],
+        [8, 8, 16, 16, 64],
+        [4, 8, 16, 16, 16],
+        [4, 8, 16, 16, 32],
+        [4, 8, 16, 32, 64],
+        [4, 8, 16, 32, 32],
+    ]
+
+    best_score=10000
+    best_score_index=0
+    grid_scores=[]
+    best_destin = None
+    best_features = None
+    best_predictor = None
+    for c in xrange(len(cents)):
+        centroids = cents[c]
+        print "Checking step %i of %i. Centroids:" % (c,len(cents)),  centroids
+        layers = len(centroids)
+        destin_video_width = 4 * 2**(layers - 1)
+        vs.setSize(destin_video_width, destin_video_width)
+        vs.rewind()
+        dn = pd.DestinNetworkAlt(destin_video_width, layers, centroids, True)
+        trainDestin(dn, layers)
+        ret = createFeatures(dn, vs, pos_struct)
+        features, labels, cv_features, cv_labels, norm_stats = ret
+        predictor = trainPredictor(features, labels)
+        train_mse, cv_mse = checkAccuracy(predictor, features, labels, cv_features, cv_labels)
+        if cv_mse < best_score:
+            best_score = cv_mse
+            best_score_index = c
+            best_destin = dn
+            best_features = ret
+            best_predictor = predictor
+
+
+        grid_scores.append({'cents':centroids, 'train_err': train_mse, 'cv_err': cv_mse})
+
+    print "Saving best destin, features, and predictor."
+    best_destin.save(destin_save_file)
+    np.save(features_save_file, best_features)
+    best_predictor.save(predictor_save_file)
+
+    info = {'best_score':best_score,'best_centroids':cents[best_score_index], 'scores':grid_scores}
+    searchDestinParams.info = info
+    print "Finished search for best destin params."
+    print info
+    return info
+
+
 def createLearningCurve(features, labels, cv_features, cv_labels):
 
     print "Creating learning curve..."
@@ -408,12 +497,16 @@ def gridSearch(features, labels):
     global grid_search_clf
     tuned_parameters = [
         {'kernel': ['rbf'],
-        'gamma': [.03, .01, .003],
-        'epsilon':[.01,.03,.1],
-        'C': [15, 30, 60]}]
+        'gamma': [.00001, .00003, .0001, .0003],
+        'epsilon':[.01],
+        'C': [1]}]
 
+    # {'C': 7, 'epsilon': 0.003, 'gamma': 0.001, 'kernel': 'rbf'}
+    #{'C': 5, 'epsilon': 0.0001, 'gamma': 0.0003, 'kernel': 'rbf'}
     score = 'mean_squared_error'
-    clf = GridSearchCV(sklearn.svm.SVR(C=1), tuned_parameters, cv=2, scoring=score, n_jobs=4)
+    clf = GridSearchCV(sklearn.svm.SVR(C=1),
+        tuned_parameters, cv=3,
+        scoring=score, n_jobs=4, verbose=3)
 
     scores = ['mean_squared_error']
     x_labels = np.asarray(labels[:,0]).reshape(-1,)
@@ -431,18 +524,20 @@ pos_struct = loadTruthLabels()
 
 if train_destin:
     dn = pd.DestinNetworkAlt(destin_video_width, layers, centroids, True)
-    dn, vs = trainDestin(dn, layers)
+    trainDestin(dn, layers)
 else:
     print "Loading destin network"
     dn = pd.DestinNetworkAlt(destin_save_file)
     dn.setIsTraining(False)
 
 if create_features:
-    features, labels, cv_features, cv_labels = createFeatures(dn, vs, pos_struct)
+    features, labels, cv_features, cv_labels, norm_stats = createFeatures(dn, vs, pos_struct)
 else:
     print "Loading features..."
-    features, labels, cv_features, cv_labels = np.load(features_save_file)
+    features, labels, cv_features, cv_labels, norm_stats = np.load(features_save_file)
     print "Finished loading features..."
+
+report_interval = features.shape[0] / 5
 
 if train_predictor:
     if search_hidden_units and predictor_type=="ANN" :
@@ -466,10 +561,24 @@ if calc_final_error:
     checkAccuracy(predictor, features, labels, cv_features, cv_labels)
 
 if show_visualization:
-    visualizePrediction(vs, predictor, dn, pos_struct)
+    visualizePrediction(vs, predictor, dn, pos_struct, norm_stats)
 
 if show_visualization_live:
-    visualizeLive(predictor, dn, pos_struct)
+    visualizeLive(predictor, dn, pos_struct, norm_stats)
 
 if create_learning_curve:
     learning_curve = createLearningCurve(features, labels, cv_features, cv_labels)
+    from matplotlib import pyplot as plt
+    x = range(len(learning_curve))
+    y1 = np.array(learning_curve)[:,0]
+    y2 = np.array(learning_curve)[:,1]
+    plt.plot(x, y1)
+    plt.plot(x, y2)
+    plt.show()
+
+if run_grid_search:
+    grid_search_clf = gridSearch(features, labels)
+
+if run_search_destin_params:
+    search_destin_results = searchDestinParams(vs, pos_struct)
+    print "Results saved in variable search_destin_results"
