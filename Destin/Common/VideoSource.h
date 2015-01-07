@@ -162,7 +162,7 @@ public:
         return (int)cap->get(CV_CAP_PROP_POS_FRAMES);
     }
 
-    int getTotalFrames(){
+    int getFrameCount(){
         return (int)cap->get(CV_CAP_PROP_FRAME_COUNT);
     }
 
@@ -205,16 +205,19 @@ public:
     /**
      * Gets the grayscale image as array of unsigned bytes ( 0 to 255)
      * Can be called in python bindings as pd.getOutputNumpy() which will return a numpy array.
-     * WARNING: The returned numpy array may cause a segfault if this VideoSource object is destroyed.
+     * It is a numpy "view" of the current frame, use numpy.copy if you need to reference past frames.
+     * WARNING: The returned numpy array may cause a segfault if used after this VideoSource object is destroyed.
      * See note at http://docs.scipy.org/doc/numpy/reference/swig.interface-file.html#argout-view-arrays
+     * (using numpy.copy will avoid this)
      *
-     * Example:
+     * Python binings example:
      * import cv2
      * import pydestin as pd
+     * import numpy as np
      * vs = pd.VideoSource(True,"")
      * cv2.waitKey(100)
      * vs.grab()
-     * img = vs.getOutputGrayMatNumpy().reshape(512,512)
+     * img = vs.getOutputGrayMatNumpy().copy().reshape(512,512)
      * cv2.imshow("Pic", img)
      * cv2.waitKey(10)
      */
@@ -224,9 +227,10 @@ public:
     }
 
     /** Same as getOutputGrayMatNumpy but with color.
-     * Python Example:
-     * img = vs.getOutputGrayMatNumpy().reshape(512,512,3) # x3 for RGB
+     * Python bindings Example:
+     * img = vs.getOutputGrayMatNumpy().copy().reshape(512,512,3) # x3 for RGB
      * cv2.imshow("Pic", img)
+     * cv2.waitKey(10)
      */
     void getOutputColorMatNumpy(int* size, uchar** output ){
         *size = flipped_frame.rows * flipped_frame.cols * flipped_frame.channels();

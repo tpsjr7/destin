@@ -3,25 +3,27 @@ import cv2
 import numpy as np
 import pydestin as pd
 import random
-import datetime
 import sklearn.svm
-import scipy.sparse
+import ZCA
 from sklearn.externals import joblib
 from sklearn.grid_search import GridSearchCV
+from operator import itemgetter
+
 
 ### Config ###
 
 train_destin =              False # If true, train destin otherwise load from destin_save_file
 randomize_cross_data =      False # if true then cross validation samples are taken among train samples,
                                   # otherwise they are taken from the end of the video
-create_features =           False # if true, create features from destin otherwise load from features_save_file
+use_raw_pixel_featues =     False  # If true, just use image pixels instead of destin beliefs, otherwise use destin features
+create_features =           False  # if true, create features from destin otherwise load from features_save_file
 train_predictor =           False # if true then train the predictor, otherwise load from predictor_save_file
 calc_final_error =          False # Run predictor on all train and test features and report the error
 show_visualization =        False # Show posistion prediction visualization on training video
 show_visualization_live =   False # Show posistion prediction with live webcam
 create_learning_curve =     False # Show learning curve of err vs number of training samples
 run_grid_search =           False # perform scikit grid search
-run_search_destin_params =  True  # search for destin params that gives best cv score
+run_search_destin_params =  False  # search for destin params that gives best cv score
 
 predictor_type="SVM" # ANN or SVM
 
@@ -184,6 +186,16 @@ def loadTruthLabels():
 
     return pos_struct
 
+def makeFeatureVector(vs,dn,be):
+    if use_raw_pixel_featues:
+        beliefs = vs.getOutputNumpy().copy()
+    else:
+        for j in range(dn.getLayerCount()): # run enough times to flush out the data from prev frames
+            dn.doDestin(vs.getOutput())
+
+        beliefs = be.getBeliefsNumpy(be.getOutputSize())
+    return beliefs
+
 def makeFeature(pos_struct, vs, index, dn, be, counter):
     ps = pos_struct
 
@@ -192,10 +204,7 @@ def makeFeature(pos_struct, vs, index, dn, be, counter):
 
     vs.setFrame(int(ps.frames[index]))
     vs.grab()
-    for j in range(dn.getLayerCount()): # run enough times to flush out the data from prev frames
-        dn.doDestin(vs.getOutput())
-
-    beliefs = be.getBeliefsNumpy(be.getOutputSize())
+    beliefs = makeFeatureVector(vs,dn,be)
     return (beliefs, ps.scaled_pos[index])
 
 def normalize(array):
@@ -279,7 +288,7 @@ def trainDestin(dn, layers):
             vs.setFrame(vs.getFrame() + jump_speed)
             if vs.grab():
                 dn.doDestin(vs.getOutput())
-                if i % 10 == 0:
+                if i % 50 == 0:
                     print "S: %d I: %d Q: %f" % (stage, i, dn.getQuality(stage))
 
     dn.setIsTraining(False)
@@ -321,33 +330,37 @@ def checkAccuracy(predictor, train_features, train_labels, cv_features, cv_label
 
     return (train_mse, cv_mse)
 
+def drawPrediction(feature, vs, destin_video_width, visual_width_x, visual_height_y,
+                   predictor, norm_stats):
+
+    ratio_x = float(visual_width_x) / labels_max_x
+    ratio_y = float(visual_height_y) / labels_max_y
+    feature = normSingleFeature(feature, norm_stats)
+    pred = predictor.predict(feature.reshape(1,feature.size))
+    pred_pos = unscale_pos(pred[0], pos_struct.min_pos, pos_struct.range_pos)
+    x = int(pred_pos[0] * ratio_x)
+    y = int(pred_pos[1] * ratio_y)
+    image = vs.getOutputColorMatNumpy().reshape(destin_video_width,destin_video_width,3)
+    resized = cv2.resize(image, (int(visual_width_x), int(visual_height_y)))
+    cv2.circle(resized, (x, y), radius=5, color=(0,255,0), thickness=-1)
+    return (resized, ratio_x, ratio_y)
+
 def visualizePrediction(vs, predictor, dn, pos_struct, norm_stats):
     print "Now displaying visualization window."
     dn.setIsTraining(False)
 
     be = pd.BeliefExporter(dn,0)
-
-    ratio_x = float(visual_width_x) / labels_max_x
-    ratio_y = float(visual_height_y) / labels_max_y
-
     i = 0
     while i < pos_struct.frames.size:
         feature, coord = makeFeature(pos_struct, vs, i, dn, be, i)
-        feature = normSingleFeature(feature, norm_stats)
-        pred = predictor.predict(feature.reshape(1,feature.size))
+        vs.grab()
 
-        pred_pos = unscale_pos(pred[0], pos_struct.min_pos, pos_struct.range_pos)
+        resized, ratio_x, ratio_y = drawPrediction(feature, vs, destin_video_width, visual_width_x, visual_height_y, predictor, norm_stats)
 
-        x = int(pred_pos[0] * ratio_x)
-        y = int(pred_pos[1] * ratio_y)
         expected_x = int(pos_struct.fpos[i][0] * ratio_x)
         expected_y = int(pos_struct.fpos[i][1] * ratio_y)
 
-        vs.grab()
-        image = vs.getOutputColorMatNumpy().reshape(destin_video_width,destin_video_width,3)
-        resized = cv2.resize(image, (int(visual_width_x), int(visual_height_y)))
         cv2.circle(resized, (expected_x, expected_y), radius=5, color=(255,0,0), thickness=-1)
-        cv2.circle(resized, (x, y), radius=5, color=(0,255,0), thickness=-1)
         cv2.imshow('frame',resized)
         wk = cv2.waitKey() # waits till key press
         if wk & 0xFF == ord('q'): # break if q is pressed
@@ -365,26 +378,11 @@ def visualizeLive(predictor, dn, pos_struct, norm_stats):
     dn.setIsTraining(False)
     wc.setSize(destin_video_width, destin_video_width)
     be = pd.BeliefExporter(dn,0)
-    ratio_x = float(visual_width_x) / labels_max_x
-    ratio_y = float(visual_height_y) / labels_max_y
 
     while True:
         if wc.grab():
-            for i in xrange(dn.getLayerCount()):
-                dn.doDestin(wc.getOutput())
-
-            feature = be.getBeliefsNumpy(be.getOutputSize())
-            feature = normSingleFeature(feature, norm_stats)
-            pred = predictor.predict(feature.reshape(1,feature.size))
-
-            pred_pos = unscale_pos(pred[0], pos_struct.min_pos, pos_struct.range_pos)
-
-            x = int(pred_pos[0] * ratio_x)
-            y = int(pred_pos[1] * ratio_y)
-
-            image = wc.getOutputColorMatNumpy().reshape(destin_video_width,destin_video_width,3)
-            resized = cv2.resize(image, (int(visual_width_x), int(visual_height_y)))
-            cv2.circle(resized, (x, y), radius=5, color=(255,0,0), thickness=-1)
+            feature = makeFeatureVector(wc,dn,be)
+            resized, ratio_x, ratio_y  = drawPrediction(feature, vs, destin_video_width, visual_width_x, visual_height_y, predictor, norm_stats)
             cv2.imshow('frame',resized)
             wk = cv2.waitKey(5)
             if wk & 0xFF == ord('q'): # break if q is pressed
@@ -414,21 +412,20 @@ def searchDestinParams(vs, pos_struct):
     print "Running search for best destin params"
 
     cents = [
-        [32, 16, 16, 16],
-        [64, 64, 64, 64],
+        [32, 32, 64, 32],
+        [16, 32, 128, 32],
+        [16, 32, 128, 64],
         [16, 32, 64, 32],
-        [8, 8, 32, 16, 16],
-        [5, 8, 16, 16, 16],
-        [8, 8, 16, 16, 16],
-        [4, 4, 8, 8],
-        [4, 4, 16, 16],
-        [8, 8, 16, 16, 8],
-        [8, 8, 16, 16, 32],
-        [8, 8, 16, 16, 64],
-        [4, 8, 16, 16, 16],
-        [4, 8, 16, 16, 32],
-        [4, 8, 16, 32, 64],
-        [4, 8, 16, 32, 32],
+        [16, 64, 64, 32],
+        [16, 32, 64, 64],
+        [8, 32, 64, 32],
+        [64,64,64],
+        [16,32,64],
+        [32,32,32],
+        [16,16,16],
+        [8,8,8],
+        [4,4,4],
+        [2,2,2],
     ]
 
     best_score=10000
@@ -457,8 +454,11 @@ def searchDestinParams(vs, pos_struct):
             best_features = ret
             best_predictor = predictor
 
-
         grid_scores.append({'cents':centroids, 'train_err': train_mse, 'cv_err': cv_mse})
+
+
+    # sort the scores by cross validation error
+    sorted(grid_scores, key=itemgetter('cv_err'))
 
     print "Saving best destin, features, and predictor."
     best_destin.save(destin_save_file)
@@ -508,13 +508,94 @@ def gridSearch(features, labels):
         tuned_parameters, cv=3,
         scoring=score, n_jobs=4, verbose=3)
 
-    scores = ['mean_squared_error']
     x_labels = np.asarray(labels[:,0]).reshape(-1,)
     #y_labels = np.asarray(labels[:,1]).reshape(-1,)
     clf.fit(features, x_labels)
     grid_search_clf = clf
     return clf
 
+def fitWhiten(vs, width, fit_frames):
+    print "Running whiten"
+    step = vs.getFrameCount() / fit_frames
+    
+    vs.setSize(width,width)
+
+    zca = ZCA.ZCA()
+    fitWhiten.zca = zca
+
+    X = []
+    # collect some frames
+    print "Collecting frames..."
+    count = 0
+    for i in xrange(0, step * fit_frames, step):
+        if i % (step * 50) == 0:
+            print "Collected",i,"of",step*fit_frames
+        vs.setFrame(i)
+        vs.grab()
+        frame = vs.getOutputGrayMatNumpy().copy()
+        X.append(frame)
+        count = count + 1
+
+    X = np.asarray(X)
+    assert X.shape == (fit_frames,width*width)
+
+    print "Fitting ZCA..."
+    zca.fit(X)
+    print "Finished fitting ZCA"
+    
+def runWhiten(width = 64, fit_frames=1000):
+    fitWhiten(vs, width, fit_frames)
+    showWhiten(vs, fitWhiten.zca, width, fit_frames)
+    
+def showWhiten(vs, zca, width, fit_frames):
+    print "Showing whitened video, press q on the window to stop."
+    print "w=whiten, n=none, m=subtract mean"
+    step = vs.getFrameCount() / fit_frames
+    display_width = 256
+    n = 0
+    mode = 'w' #whiten or mean
+    def rescale(x):
+        x = x.astype(np.float)
+        x = (x - x.min()) / x.ptp() * 255.0
+        return x.astype(np.uint8).reshape(1,-1)
+    
+    while True:
+        vs.setFrame(n)
+        vs.grab()
+        frame = vs.getOutputGrayMatNumpy()
+        
+        if mode == 'm':
+            whitened = rescale(frame)
+        elif mode == 'w':
+            whitened = rescale(zca.transform(frame))
+        else:
+            whitened = frame.reshape(1,-1)
+
+        
+        assert whitened.shape == (1,width * width)
+        whitened = whitened.reshape(width,width)
+        whitened = cv2.resize(whitened, (display_width, display_width))
+        cv2.imshow("whitened", whitened)
+        val = cv2.waitKey() & 0xFF
+        if val == ord('q'):
+            break
+        elif val == ord('w'):
+            mode = 'w'
+        elif val == ord('m'):
+            mode = 'm'
+        elif val == ord('n'):
+            mode = 'n'
+        else:
+            n = n + step
+
+def visualizeEignvalues(which=0):
+    zca = fitWhiten.zca
+    comp = zca.U_[which]
+    width = np.sqrt(comp.shape[0])
+    comp = zca.mean_
+    img = cv2.resize(comp.reshape(width, width).astype(np.uint8), (256,256))
+    cv2.imshow("components", img)
+    cv2.waitKey()
 
 ## Script body ##
 print  "Creating video source."
@@ -530,14 +611,14 @@ else:
     dn = pd.DestinNetworkAlt(destin_save_file)
     dn.setIsTraining(False)
 
+report_interval = vs.getFrameCount() * (1.0 - cross_valid_frac) / 5.0
+
 if create_features:
     features, labels, cv_features, cv_labels, norm_stats = createFeatures(dn, vs, pos_struct)
 else:
     print "Loading features..."
     features, labels, cv_features, cv_labels, norm_stats = np.load(features_save_file)
     print "Finished loading features..."
-
-report_interval = features.shape[0] / 5
 
 if train_predictor:
     if search_hidden_units and predictor_type=="ANN" :
