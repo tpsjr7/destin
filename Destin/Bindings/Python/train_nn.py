@@ -579,6 +579,8 @@ def showWhiten(vs, zca, width, fit_frames):
         val = cv2.waitKey() & 0xFF
         if val == ord('q'):
             break
+        elif val == ord('s'):
+            n = n + 1
         elif val == ord('w'):
             mode = 'w'
         elif val == ord('m'):
