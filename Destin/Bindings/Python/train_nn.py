@@ -590,15 +590,6 @@ def showWhiten(vs, zca, width, fit_frames):
         else:
             n = n + step
 
-def visualizeEignvalues(which=0):
-    zca = fitWhiten.zca
-    comp = zca.U_[which]
-    width = np.sqrt(comp.shape[0])
-    comp = zca.mean_
-    img = cv2.resize(comp.reshape(width, width).astype(np.uint8), (256,256))
-    cv2.imshow("components", img)
-    cv2.waitKey()
-
 ## Script body ##
 print  "Creating video source."
 vs = pd.VideoSource(False, input_video)

@@ -4,6 +4,17 @@ from scipy import linalg
 from sklearn.utils import array2d, as_float_array
 from sklearn.base import TransformerMixin, BaseEstimator
 
+def _visualizeEignvalues(zca, which=0):
+    comp = zca.U_[:,which]
+    width = np.sqrt(comp.shape[0])
+    
+    rescaled = (comp - comp.min()) / comp.ptp() * 255.0
+    rescaled = rescaled.reshape(width, width).astype(np.uint8)
+    img = cv2.resize(rescaled, (256,256))
+    cv2.imshow("components", img)
+    cv2.waitKey(100)   
+    
+
 class ZCA(BaseEstimator, TransformerMixin):
 
     def __init__(self, regularization=10**-5, copy=False):
@@ -30,11 +41,11 @@ class ZCA(BaseEstimator, TransformerMixin):
         return t
 
     def visualizeEignvalues(self, which=0):
-        comp = self.U_[which]
-        width = np.sqrt(comp.shape[0])
-
-        rescaled = (comp - comp.min()) / comp.ptp() * 255.0
-        rescaled = rescaled.reshape(width, width).astype(np.uint8)
-        img = cv2.resize(rescaled, (256,256))
-        cv2.imshow("components", img)
-        cv2.waitKey()
+        _visualizeEignvalues(self, which)
+        
+    def varianceReport(self, fraction=0.99):
+        size = self.S_.shape[0]
+        r = np.bincount(np.cumsum(self.S_) / self.S_.sum() > fraction)[0] / float(size)
+        print "Need to keep",r,"of the features, or",int(np.ceil(r*size)),"of",size
+        
+        
